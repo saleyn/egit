@@ -37,12 +37,20 @@ After obtaining a repository reference, you can call functions in the
 `egit` module. E.g.:
 
 ```erlang
-2> egit:cat_file(Repo, <<"master">>).
+2> egit:cat_file(Repo, <<"main">>).
+{ok,{commit,#{message => <<"Initial commit\n">>,
+              author =>
+                  {<<"Serge Aleynikov">>,<<"saleyn@gmail.com">>,1685857770,
+                   -14400},
+              committer =>
+                  {<<"Serge Aleynikov">>,<<"saleyn@gmail.com">>,1685857770,
+                   -14400},
+              parents => []}}}
 ```
 
 ## Author
 
-Serge Aleynikov <saleyn at gmail dot com>
+Serge Aleynikov <saleyn@gmail.com>
 
 
 ## License
