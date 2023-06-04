@@ -16,10 +16,8 @@
   header      |
   tree_id.
 -type commit_opts()     :: [commit_opt()].
-
 -type cat_file_opt()    :: type | size | all.
-
--type checkout_opt()    :: type | size | all.
+-type checkout_opt()    :: force | verbose | perf.
 -type checkout_opts()   :: [checkout_opt()].
 -type checkout_stats()  :: #{
   chmod_calls => integer(),
@@ -115,3 +113,20 @@ fetch_or_pull(Repo, _Op) when is_reference(Repo) ->
 fetch_or_pull(Repo, _Op, Remote) when is_reference(Repo), is_binary(Remote) ->
   ?NOT_LOADED_ERROR.
 
+-ifdef(EUNIT).
+
+clone_test_() ->
+  {setup,
+    fun()  -> file:del_dir_r("/tmp/egit"), ok end,
+    fun(_) -> file:del_dir_r("/tmp/egit"), ok end,
+    [
+      fun() ->
+        R = egit:clone(<<"https://github.com/saleyn/egit.git">>, <<"/tmp/egit">>),
+        ?assert(is_reference(R)),
+        ?assertEqual(ok, egit:fetch(R)),
+        ?assertEqual(ok, egit:pull(R)),
+        ?assertEqual(ok, egit:checkout(R, <<"main">>))
+      end
+    ]}.
+
+-endif.

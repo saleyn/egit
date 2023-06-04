@@ -1,5 +1,7 @@
 # egit - Erlang interface to Git
 
+[![build](https://github.com/saleyn/egit/actions/workflows/erlang.yml/badge.svg)](https://github.com/saleyn/egit/actions/workflows/erlang.yml)
+
 This project is an Erlang NIF wrapper to `libgit2` library.
 
 The project is currently in the alpha stage and more functionality is being

@@ -9,5 +9,8 @@ all: compile
 compile clean:
 	@$(REBAR) $@
 
+test:
+	$(REBAR) eunit
+
 run:
 	$(REBAR) shell
