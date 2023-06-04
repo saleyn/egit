@@ -58,7 +58,7 @@ open(Path) when is_binary(Path) ->
 -spec fetch(repository()) -> ok | {error, binary()}.
 fetch(Repo)         -> fetch_or_pull(Repo, fetch).
 
-%% @doc Fetch from given remote (e.g. <<"origin">>)
+%% @doc Fetch from given remote (e.g. `<<"origin">>')
 -spec fetch(repository(), binary()) -> ok | {error, binary()}.
 fetch(Repo, Remote) -> fetch_or_pull(Repo, fetch, Remote).
 
@@ -66,7 +66,7 @@ fetch(Repo, Remote) -> fetch_or_pull(Repo, fetch, Remote).
 -spec pull(repository()) -> ok | {error, binary()}.
 pull(Repo)          -> fetch_or_pull(Repo, pull).
 
-%% @doc Pull from given remote (e.g. <<"origin">>)
+%% @doc Pull from given remote (e.g. `<<"origin">>')
 -spec pull(repository(), binary()) -> ok | {error, binary()}.
 pull(Repo, Remote)  -> fetch_or_pull(Repo, pull, Remote).
 

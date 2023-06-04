@@ -4,19 +4,37 @@ This project is an Erlang NIF wrapper to `libgit2` library
 
 ## Installation
 
-Make sure you have `libgit2` installed.
+- Make sure you have `libgit2` installed.
+    - On Ubuntu run: `sudo apt-get install libgit2-dev`
+    - On Arch Linux run: `sudo pacman -S libgit2`
+    - On Mac OS run: `brew install libgit2`
 
-- On Ubuntu run: `sudo apt-get install libgit2-dev`
-- On Arch Linux run: `sudo pacman -S libgit2`
-- On Mac OS run: `brew install libgit2`
-
-After that run:
+- If you are building locally from source, clone [egit](https://github.com/saleyn/egit)
+and run:
 ```shell
 $ make
 ```
 
+- For Erlang projects add dependency in `rebar.config`:
+```erlang
+{deps,
+ [% ...
+  {egit, "~> 0.1"}
+ ]}.
+```
+
+- For Elixir projects add dependency in `mix.exs`:
+```elixir
+def deps do
+ [
+  egit: "~> 0.1"
+ ]
+end
+```
+
 ## Usage
 
+Include 
 To clone a repository, give it a URL and a local path:
 ```erlang
 1> Repo = egit:clone("http://github.com/saleyn/egit.git", "/tmp").
