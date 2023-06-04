@@ -5,9 +5,11 @@
 #include <tuple>
 #include <vector>
 #include <atomic>
+#include <format>
 #include <git2.h>
 #include "egit_utils.hpp"
 #include "egit_cat_file.hpp"
+#include "egit_checkout.hpp"
 
 static ErlNifResourceType* GIT_REPO_RESOURCE;
 
@@ -137,10 +139,10 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   GitCommit pcommit;
 
   if (git_commit_lookup(pcommit.ptr(), repo->get(), &oid) < 0)
-    return raise_error(env, "Failed to find git commit " + sha); 
+    return raise_git_error(env, "Failed to find git commit " + sha);
 
   auto commit = pcommit.get();
- 
+
   ERL_NIF_TERM  head, list = argv[2];
 
   while (enif_get_list_cell(env, list, &head, &list)) {
@@ -179,7 +181,7 @@ static ERL_NIF_TERM clone_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
   git_repository* p{};
 
   if (git_clone(&p, surl.c_str(), spath.c_str(), nullptr) < 0) [[unlikely]]
-    return raise_error(env, "Failed to clone git repo " + surl); 
+    return raise_git_error(env, "Failed to clone git repo " + surl);
 
   return to_monitored_resource(env, p);
 }
@@ -197,7 +199,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
   git_repository* p{};
 
   if (git_repository_open(&p, spath.c_str()) < 0) [[unlikely]]
-    return raise_error(env, "Failed to open git repo " + spath); 
+    return raise_git_error(env, "Failed to open git repo " + spath);
 
   return to_monitored_resource(env, p);
 }
@@ -230,12 +232,12 @@ static ERL_NIF_TERM fetch_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
   git_remote* remote;
 
   if (git_remote_lookup(&remote, repo->get(), remote_name.c_str()) < 0)
-    return make_error(env, "Failed to lookup remote " + remote_name);
+    return make_git_error(env, "Failed to lookup remote " + remote_name);
   if (git_remote_fetch(remote,
                        NULL,               // refspecs, NULL to use the configured ones
                        NULL,               // options, empty for defaults
                        fetch_or_pull) < 0) // reflog mesage, "fetch" (or NULL) or "pull"
-    return make_error(env, "Failed to fetch from " + remote_name);
+    return make_git_error(env, "Failed to fetch from " + remote_name);
 
   return ATOM_OK;
 }
@@ -255,6 +257,26 @@ static ERL_NIF_TERM cat_file_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
   std::string filename((char*)bin.data, bin.size);
 
   return cat_file(env, repo->get(), filename, argv[2]);
+}
+
+static ERL_NIF_TERM checkout_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[2])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string rev((char*)bin.data, bin.size);
+
+  return checkout(env, repo->get(), rev, argv[2]);
 }
 
 static void resource_dtor(ErlNifEnv* env, void* arg)
@@ -295,6 +317,7 @@ static ErlNifFunc egit_funcs[] =
   {"open",          1, open_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"fetch_or_pull", 2, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"fetch_or_pull", 3, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"checkout",      3, checkout_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"cat_file",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"commit_lookup", 3, commit_lookup_nif, 0},
 };

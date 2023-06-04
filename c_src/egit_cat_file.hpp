@@ -1,16 +1,19 @@
-/*
- * libgit2 "cat-file" example - shows how to print data from the ODB
- *
- * Written by the libgit2 contributors
- *
- * To the extent possible under law, the author(s) have dedicated all copyright
- * and related and neighboring rights to this software to the public domain
- * worldwide. This software is distributed without any warranty.
- *
- * You should have received a copy of the CC0 Public Domain Dedication along
- * with this software. If not, see
- * <http://creativecommons.org/publicdomain/zero/1.0/>.
- */
+//-----------------------------------------------------------------------------
+// This code was derived from
+// https://github.com/libgit2/libgit2/blob/main/examples/checkout.c
+//-----------------------------------------------------------------------------
+// libgit2 "cat-file" example - dreturn data from the git ODB
+//-----------------------------------------------------------------------------
+// Written by the libgit2 contributors
+//
+// To the extent possible under law, the author(s) have dedicated all copyright
+// and related and neighboring rights to this software to the public domain
+// worldwide. This software is distributed without any warranty.
+//
+// You should have received a copy of the CC0 Public Domain Dedication along
+// with this software. If not, see
+// <http://creativecommons.org/publicdomain/zero/1.0/>.
+//-----------------------------------------------------------------------------
 #pragma once
 
 #include <git2/common.h>
@@ -57,7 +60,7 @@ static ERL_NIF_TERM encode_blob(ErlNifEnv* env, const git_blob* blob)
         std::string_view((const char*)git_blob_rawcontent(blob), (size_t)git_blob_rawsize(blob)))));
 }
 
-/** Show each entry with its type, id and attributes */
+/// Return each entry with its type, id and attributes
 static ERL_NIF_TERM encode_tree(ErlNifEnv* env, const git_tree *tree)
 {
   size_t i, max_i = (int)git_tree_entrycount(tree);
@@ -85,9 +88,7 @@ static ERL_NIF_TERM encode_tree(ErlNifEnv* env, const git_tree *tree)
       enif_make_list_from_array(env, &v.front(), v.size())));
 }
 
-/**
- * Commits and tags have a few interesting fields in their header.
- */
+/// Commits and tags have a few interesting fields in their header.
 static ERL_NIF_TERM encode_commit(ErlNifEnv* env, const git_commit* commit)
 {
   char oidstr[GIT_OID_SHA1_HEXSIZE + 1];
@@ -152,90 +153,68 @@ enum catfile_mode {
   SHOW_SIZE,
 };
 
-/* Forward declarations for option-parsing helper */
+/// Forward declarations for option-parsing helper
 struct catfile_options {
-  catfile_options() : action(SHOW_ALL), dir(".") {}
+  catfile_options() : action(SHOW_ALL) {}
 
   catfile_mode action;
-  std::string  dir;
 };
 
-// Parse the command-line options taken from git
+/// Parse the command-line options taken from git
 static ERL_NIF_TERM
 parse_opts(ErlNifEnv* env, ERL_NIF_TERM opt, catfile_options& o)
 {
-  const ERL_NIF_TERM* tagval;
-  int                 arity;
-
   o.action = SHOW_ALL;
 
   if      (enif_is_identical(opt, ATOM_TYPE)) o.action  = SHOW_TYPE;
   else if (enif_is_identical(opt, ATOM_SIZE)) o.action  = SHOW_SIZE;
   else if (enif_is_identical(opt, ATOM_ALL))  o.action  = SHOW_ALL;
-  else if (enif_get_tuple(env, opt, &arity, &tagval) && arity == 2) {
-    ErlNifBinary bin;
-    if (enif_is_identical(tagval[0], ATOM_DIR) && enif_inspect_binary(env, tagval[1], &bin))
-      o.dir = std::string((char*)bin.data, bin.size);
-    else if (enif_is_identical(tagval[0], ATOM_REV) && enif_inspect_binary(env, tagval[1], &bin))
-      o.dir = std::string((char*)bin.data, bin.size);
-    else [[unlikely]]
-      return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, opt));
-  }
   else [[unlikely]]
     return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, opt));
 
   return 0;
 }
 
-/** Entry point for this command */
-static ERL_NIF_TERM cat_file(ErlNifEnv* env, git_repository* repo, std::string const& rev, ERL_NIF_TERM list)
+/// Entry point for this command
+static ERL_NIF_TERM cat_file(ErlNifEnv* env, git_repository* repo, std::string const& rev, ERL_NIF_TERM opts)
 {
   catfile_options o;
 
-  auto res = parse_opts(env, list, o);
+  auto res = parse_opts(env, opts, o);
 
   if (res != 0) [[unlikely]]
     return res;
 
-  git_object* obj = NULL;
+  SmartPtr<git_object> obj(git_object_free);
 
-  if (git_revparse_single(&obj, repo, rev.c_str()) < 0)
-    return make_error(env, "Could not resolve " + rev);
+  if (git_revparse_single(&obj, repo, rev.c_str()) != GIT_OK)
+    return make_git_error(env, "Could not resolve " + rev);
 
-  SMART_PTR(obj, git_object_free);
- 
   switch (o.action) {
     case SHOW_TYPE:
       return enif_make_tuple2(env, ATOM_OK,
                enif_make_atom(env, git_object_type2string(git_object_type(obj))));
     case SHOW_SIZE: {
-      git_odb*        odb;
-      git_odb_object* odbobj;
+      SmartPtr<git_odb> odb(git_odb_free);
+      if (git_repository_odb(&odb, repo) != GIT_OK) [[unlikely]]
+        return make_git_error(env, "Could not open ODB");
 
-      if (git_repository_odb(&odb, repo) < 0) [[unlikely]]
-        return make_error(env, "Could not open ODB");
-
-      SMART_PTR(odb, git_odb_free);
-
-      if (git_odb_read(&odbobj, odb, git_object_id(obj))) [[unlikely]]
-        return make_error(env, "Could not find obj");
-
-      SMART_PTR(odbobj, git_odb_object_free);
+      SmartPtr<git_odb_object> odbobj(git_odb_object_free);
+      if (git_odb_read(&odbobj, odb.get(), git_object_id(obj)) != GIT_OK) [[unlikely]]
+        return make_git_error(env, "Could not find obj");
 
       return enif_make_tuple2(env, ATOM_OK, enif_make_long(env, (long)git_odb_object_size(odbobj)));
     }
     case SHOW_ALL:
       switch (git_object_type(obj)) {
-        case GIT_OBJECT_BLOB:   return encode_blob  (env, (const git_blob*)  obj);
-        case GIT_OBJECT_COMMIT: return encode_commit(env, (const git_commit*)obj);
-        case GIT_OBJECT_TREE:   return encode_tree  (env, (const git_tree*)  obj);
-        case GIT_OBJECT_TAG:    return encode_tag   (env, (const git_tag*)   obj);
+        case GIT_OBJECT_BLOB:   return encode_blob  (env, obj.template cast<const git_blob*>());
+        case GIT_OBJECT_COMMIT: return encode_commit(env, obj.template cast<const git_commit*>());
+        case GIT_OBJECT_TREE:   return encode_tree  (env, obj.template cast<const git_tree*>());
+        case GIT_OBJECT_TAG:    return encode_tag   (env, obj.template cast<const git_tag*>());
         default: {
           char oidstr[GIT_OID_SHA1_HEXSIZE + 1];
           git_oid_tostr(oidstr, sizeof(oidstr), git_object_id(obj));
-          char buf[256];
-          snprintf(buf, sizeof(buf), "unknown object type %s", oidstr);
-          return make_error(env, buf);
+          return make_git_error(env, std::format("Unknown object type {}", oidstr));
         }
       }
       break;

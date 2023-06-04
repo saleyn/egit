@@ -8,3 +8,6 @@ all: compile
 
 compile clean:
 	@$(REBAR) $@
+
+run:
+	$(REBAR) shell
