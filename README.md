@@ -1,6 +1,9 @@
 # egit - Erlang interface to Git
 
-This project is an Erlang NIF wrapper to `libgit2` library
+This project is an Erlang NIF wrapper to `libgit2` library.
+
+The project is currently in the alpha stage and more functionality is being
+added.
 
 ## Installation
 

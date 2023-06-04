@@ -3,3 +3,4 @@
 /c_src/*.o
 /priv/*.so
 /_build
+/doc
