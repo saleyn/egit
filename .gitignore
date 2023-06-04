@@ -1,0 +1,5 @@
+*.swp
+*.dump
+/c_src/*.o
+/priv/*.so
+/_build

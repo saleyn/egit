@@ -1,0 +1,71 @@
+#pragma once
+
+static ERL_NIF_TERM ATOM_ALL;
+static ERL_NIF_TERM ATOM_AUTHOR;
+static ERL_NIF_TERM ATOM_BADARG;
+static ERL_NIF_TERM ATOM_BLOB;
+static ERL_NIF_TERM ATOM_COMMIT;
+static ERL_NIF_TERM ATOM_COMMITTER;
+static ERL_NIF_TERM ATOM_DIR;
+static ERL_NIF_TERM ATOM_ENCODING;
+static ERL_NIF_TERM ATOM_ENOCALLBACK;
+static ERL_NIF_TERM ATOM_ENOMEM;
+static ERL_NIF_TERM ATOM_ENOPROCESS;
+static ERL_NIF_TERM ATOM_ERROR;
+static ERL_NIF_TERM ATOM_FALSE;
+static ERL_NIF_TERM ATOM_FETCH;
+static ERL_NIF_TERM ATOM_HEADER;
+static ERL_NIF_TERM ATOM_MESSAGE;
+static ERL_NIF_TERM ATOM_NIL;
+static ERL_NIF_TERM ATOM_OBJECT;
+static ERL_NIF_TERM ATOM_OK;
+static ERL_NIF_TERM ATOM_PARENTS;
+static ERL_NIF_TERM ATOM_PULL;
+static ERL_NIF_TERM ATOM_REV;
+static ERL_NIF_TERM ATOM_SIZE;
+static ERL_NIF_TERM ATOM_SUMMARY;
+static ERL_NIF_TERM ATOM_TAG;
+static ERL_NIF_TERM ATOM_TAGGER;
+static ERL_NIF_TERM ATOM_TIME;
+static ERL_NIF_TERM ATOM_TIME_OFFSET;
+static ERL_NIF_TERM ATOM_TREE;
+static ERL_NIF_TERM ATOM_TREE_ID;
+static ERL_NIF_TERM ATOM_TRUE;
+static ERL_NIF_TERM ATOM_TYPE;
+static ERL_NIF_TERM ATOM_VERBOSE;
+
+inline void init_atoms(ErlNifEnv* env)
+{
+  ATOM_ALL         = enif_make_atom(env, "all");
+  ATOM_AUTHOR      = enif_make_atom(env, "author");
+  ATOM_BADARG      = enif_make_atom(env, "badarg");
+  ATOM_BLOB        = enif_make_atom(env, "blob");
+  ATOM_COMMIT      = enif_make_atom(env, "commit");
+  ATOM_COMMITTER   = enif_make_atom(env, "committer");
+  ATOM_DIR         = enif_make_atom(env, "show_dir");
+  ATOM_ENCODING    = enif_make_atom(env, "encoding");
+  ATOM_ENOCALLBACK = enif_make_atom(env, "enocallback");
+  ATOM_ENOMEM      = enif_make_atom(env, "enomem");
+  ATOM_ENOPROCESS  = enif_make_atom(env, "enoprocess");
+  ATOM_ERROR       = enif_make_atom(env, "error");
+  ATOM_FALSE       = enif_make_atom(env, "false");
+  ATOM_FETCH       = enif_make_atom(env, "fetch");
+  ATOM_HEADER      = enif_make_atom(env, "header");
+  ATOM_MESSAGE     = enif_make_atom(env, "message");
+  ATOM_NIL         = enif_make_atom(env, "nil");
+  ATOM_OBJECT      = enif_make_atom(env, "object");
+  ATOM_OK          = enif_make_atom(env, "ok");
+  ATOM_PARENTS     = enif_make_atom(env, "parents");
+  ATOM_PULL        = enif_make_atom(env, "pull");
+  ATOM_SIZE        = enif_make_atom(env, "size");
+  ATOM_SUMMARY     = enif_make_atom(env, "summary");
+  ATOM_TAG         = enif_make_atom(env, "tag");
+  ATOM_TAGGER      = enif_make_atom(env, "tagger");
+  ATOM_TIME        = enif_make_atom(env, "time");
+  ATOM_TIME_OFFSET = enif_make_atom(env, "time_offset");
+  ATOM_TREE        = enif_make_atom(env, "tree");
+  ATOM_TREE_ID     = enif_make_atom(env, "tree_id");
+  ATOM_TRUE        = enif_make_atom(env, "true");
+  ATOM_TYPE        = enif_make_atom(env, "type");
+  ATOM_VERBOSE     = enif_make_atom(env, "verbose");
+}
