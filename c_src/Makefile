@@ -9,28 +9,52 @@ ERL_LDFLAGS  ?= $(shell erl -noshell -noinput -eval "io:format(\"-L~ts\", [code:
 DEBUG     ?= 0
 NIF_DEBUG ?= $(DEBUG)
 
+CXX       ?= g++
+
+CXX_VSN   ?= $(shell $(CXX) --version | sed -n '1s/^[^0-9]\+\([0-9]\+\)\(.[0-9-]\)\+.*$$/\1/p')
+
+ifeq ($(STD_FMT),)
+  ifeq ($(basename $(CXX)),g++)
+    ifeq ($(shell expr $(CXX_VSN) \>= 13),1)
+      STD_FMT=1
+    else
+      STD_FMT=0
+    endif
+  else ifeq ($(basename $(CXX)),clang++)
+    ifeq ($(shell expr $(CXX_VSN) \>= 15),1)
+      STD_FMT=1
+    else
+      STD_FMT=0
+    endif
+  else
+    STD_FMT=0
+  endif
+endif
+
+ifeq ($(STD_FMT),0)
+  $(warning ==> $(CXX) major version: $(CXX_VSN))
+  CPPFLAGS += -DFMT_HEADER_ONLY -DUSE_FMT_LIB=1 -Ifmt/include
+endif
+
 # System type and C compiler/flags.
 
 ifeq ($(NIF_DEBUG),0)
-	OPTIMIZE = -O3 -DNDEBUG
+  OPTIMIZE = -O3 -DNDEBUG
 else
-	OPTIMIZE = -O0 -g
+  OPTIMIZE = -O0 -g
 endif
 
-UNAME_SYS := $(shell uname -s)
+UNAME_SYS  := $(shell uname -s)
 ifeq ($(UNAME_SYS), Linux)
-	CXX = g++
-	CXXFLAGS ?= -mavx2 -finline-functions -Wall -std=c++20 
+  CXXFLAGS ?= -mavx2 -finline-functions -Wall -std=c++20
 else ifeq ($(UNAME_SYS), Darwin)
-	CXX = g++
-	CXXFLAGS ?= -mavx2 -arch x86_64 -finline-functions -Wall -std=c++20 -pie
-	LDFLAGS ?= -arch x86_64 -flat_namespace -undefined suppress
+  CXXFLAGS ?= -mavx2 -arch x86_64 -finline-functions -Wall -std=c++20 -pie
+  LDFLAGS  ?= -arch x86_64 -flat_namespace -undefined suppress
 else ifeq ($(UNAME_SYS), FreeBSD)
-	CXX = g++
-	CXXFLAGS ?= -mavx2 -finline-functions -Wall -std=c++20
+  CXXFLAGS ?= -mavx2 -finline-functions -Wall -std=c++20
 endif
 
-CXXFLAGS   += $(SIMDJSON_FLAGS) $(OPTIMIZE) -fPIC $(ERL_CXXFLAGS)
+CXXFLAGS   += $(OPTIMIZE) -fPIC $(ERL_CXXFLAGS)
 LDFLAGS    += $(ERL_LDFLAGS) -lei -lgit2 -shared
 
 SRC_DIR     = $(CURDIR)
@@ -39,7 +63,7 @@ SO_OUTPUT  ?= $(BASEDIR)/priv/$(PROJECT).so
 SOURCES    := $(wildcard $(SRC_DIR)/*.cpp)
 OBJECTS     = $(addsuffix .o, $(basename $(SOURCES)))
 
-COMPILE_CPP = $(cpp_verbose) $(CXX) $(CXXFLAGS) $(CPPFLAGS) -c
+COMPILE_CPP = $(CXX) $(CXXFLAGS) $(CPPFLAGS) -c
 
 # Targets
 
@@ -53,4 +77,11 @@ $(SO_OUTPUT): $(OBJECTS)
 	$(CXX) $(OBJECTS) $(LDFLAGS) -o $(SO_OUTPUT)
 
 %.o: %.cpp $(wildcard *.hpp)
+	@if [ $(STD_FMT) -eq 0 ]; then \
+	  echo "==> Updating fmt submodule"; \
+		git config --global --add safe.directory '*'; \
+		git submodule init; \
+		git submodule update --remote; \
+		ls -l *; \
+	fi
 	$(COMPILE_CPP) $(OUTPUT_OPTION) $<

@@ -16,7 +16,6 @@
 //-----------------------------------------------------------------------------
 #pragma once
 
-#include <format>
 #include <git2/common.h>
 
 // Define the printf format specifier to use for size_t output

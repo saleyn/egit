@@ -1,6 +1,7 @@
 *.swp
 *.dump
 /c_src/*.o
+/c_src/fmt
 /priv/*.so
 /_build
 /doc

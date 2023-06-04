@@ -20,6 +20,16 @@ jobs:
       with:
         # Checkout all history for all branches and tags
         fetch-depth: 0
+    - name: Install latest g++
+      run: |
+        # apt update && apt-get install -y software-properties-common
+        # apt-get install -y g++-10
+        ls -l /usr/bin/g++*
+        update-alternatives --install /usr/bin/g++ g++ /usr/bin/gcc-10 100
+        g++ --version
+    - name: Install libgit2
+      run: |
+        apt-get update -y && apt-get install -y libgit2-dev
     - name: Compile
       run:  make
     - name: Run tests

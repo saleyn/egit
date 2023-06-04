@@ -5,7 +5,18 @@
 #include <tuple>
 #include <vector>
 #include <atomic>
+
+#ifndef USE_FMT_LIB
 #include <format>
+#else
+#include <fmt/format.h>
+namespace std { using namespace fmt; }
+#endif
+
+#ifndef GIT_OID_SHA1_HEXSIZE
+#define GIT_OID_SHA1_HEXSIZE GIT_OID_HEXSZ
+#endif
+
 #include <git2.h>
 #include "egit_utils.hpp"
 #include "egit_cat_file.hpp"
@@ -125,7 +136,7 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     vals.push_back(enif_make_int64(env, val));
   };
 
-  auto pusht = [&keys, &vals, env](ERL_NIF_TERM key, ERL_NIF_TERM val) {
+  auto pusht = [&keys, &vals](ERL_NIF_TERM key, ERL_NIF_TERM val) {
     keys.push_back(key);
     vals.push_back(val);
   };
