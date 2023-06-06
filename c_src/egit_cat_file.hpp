@@ -1,8 +1,8 @@
 //-----------------------------------------------------------------------------
 // This code was derived from
-// https://github.com/libgit2/libgit2/blob/main/examples/checkout.c
+// https://github.com/libgit2/libgit2/blob/main/examples/cat-file.c
 //-----------------------------------------------------------------------------
-// libgit2 "cat-file" example - dreturn data from the git ODB
+// libgit2 "cat-file" - return data from the git ODB
 //-----------------------------------------------------------------------------
 // Written by the libgit2 contributors
 //
@@ -88,13 +88,12 @@ static ERL_NIF_TERM encode_tree(ErlNifEnv* env, const git_tree *tree)
       enif_make_list_from_array(env, &v.front(), v.size())));
 }
 
-/// Commits and tags have a few interesting fields in their header.
+// Commits and tags have a few interesting fields in their header.
 static ERL_NIF_TERM encode_commit(ErlNifEnv* env, const git_commit* commit)
 {
   char oidstr[GIT_OID_SHA1_HEXSIZE + 1];
 
   git_oid_tostr(oidstr, sizeof(oidstr), git_commit_tree_id(commit));
-  printf("tree %s\r\n", oidstr);
 
   auto max_i = (unsigned int)git_commit_parentcount(commit);
   std::vector<ERL_NIF_TERM> v;
@@ -107,8 +106,9 @@ static ERL_NIF_TERM encode_commit(ErlNifEnv* env, const git_commit* commit)
 
   auto msg = git_commit_message(commit);
 
-  ERL_NIF_TERM keys[] = {ATOM_PARENTS, ATOM_AUTHOR, ATOM_COMMITTER, ATOM_MESSAGE};
+  ERL_NIF_TERM keys[] = {ATOM_OID, ATOM_PARENTS, ATOM_AUTHOR, ATOM_COMMITTER, ATOM_MESSAGE};
   ERL_NIF_TERM vals[] = {
+    make_binary(env, oidstr),
     enif_make_list_from_array(env, &v.front(), v.size()),
     print_signature(env, git_commit_author(commit)),
     print_signature(env, git_commit_committer(commit)),
@@ -175,8 +175,8 @@ parse_opts(ErlNifEnv* env, ERL_NIF_TERM opt, catfile_options& o)
   return 0;
 }
 
-/// Entry point for this command
-static ERL_NIF_TERM cat_file(ErlNifEnv* env, git_repository* repo, std::string const& rev, ERL_NIF_TERM opts)
+// Entry point for this command
+static ERL_NIF_TERM lg2_cat_file(ErlNifEnv* env, git_repository* repo, std::string const& rev, ERL_NIF_TERM opts)
 {
   catfile_options o;
 

@@ -1,6 +1,7 @@
 -module(egit).
 -export([clone/2, open/1, fetch/1, fetch/2, pull/1, pull/2, commit_lookup/3]).
 -export([cat_file/2, cat_file/3, checkout/2, checkout/3]).
+-export([add_all/1, add/2, add/3, commit/2, rev_parse/2]).
 
 -on_load(init/0).
 
@@ -25,6 +26,10 @@
   stat_calls  => integer(),
   total_steps => integer()
 }.
+
+-type add_opt()         :: verbose | dry_run | update | force.
+-type add_opts()        :: [add_opt()].
+
 -export_type([repository/0, commit_opts/0, cat_file_opt/0, checkout_opts/0, checkout_stats/0]).
 
 -define(LIBNAME, ?MODULE).
@@ -99,6 +104,33 @@ checkout(Repo, Revision) ->
 checkout(Repo, Revision, Opts) when is_reference(Repo), is_binary(Revision), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
+%% @doc Add all pending changes
+add_all(Repo) when is_reference(Repo) ->
+  add_nif(Repo, [<<".">>], []).
+
+%% @doc Same as `add(Repo, FileSpecs, Opts)'.
+-spec add(repository(), binary()|[binary()]) -> [binary()] | {error, term()}.
+add(Repo, PathSpecs) ->
+  add(Repo, PathSpecs, []).
+
+%% @doc Add files matching `PathSpecs' to index.
+-spec add(repository(), [binary()], add_opts()) -> [binary()] | {error, term()}.
+add(Repo, PathSpec, Opts) when is_binary(PathSpec) ->
+  add(Repo, [PathSpec], Opts);
+
+add(Repo, PathSpecs, Opts) when is_reference(Repo), is_list(PathSpecs), is_list(Opts) ->
+  add_nif(Repo, PathSpecs, Opts).
+
+%% @doc Commit changes to a repository
+-spec commit(repository(), binary()) -> {ok, OID::binary()} | {error, binary()|atom()}.
+commit(_Repo, Comment) when is_binary(Comment) ->
+  ?NOT_LOADED_ERROR.
+
+%% @doc Reverse parse a reference
+-spec rev_parse(repository(), binary()) -> map() | {error, binary()|atom()}.
+rev_parse(_Repo, Spec) when is_binary(Spec) ->
+  ?NOT_LOADED_ERROR.
+
 %% @doc Lookup commit details identified by OID
 -spec commit_lookup(repository(), binary(), [commit_opt()]) -> #{commit_opt() => term()}.
 commit_lookup(_Repo, OID, Opts) when is_binary(OID), is_list(Opts) ->
@@ -113,6 +145,9 @@ fetch_or_pull(Repo, _Op) when is_reference(Repo) ->
 fetch_or_pull(Repo, _Op, Remote) when is_reference(Repo), is_binary(Remote) ->
   ?NOT_LOADED_ERROR.
 
+add_nif(Repo, PathSpecs, Opts) when is_reference(Repo), is_list(PathSpecs), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
 -ifdef(EUNIT).
 
 clone_test_() ->
@@ -125,7 +160,21 @@ clone_test_() ->
         ?assert(is_reference(R)),
         ?assertEqual(ok, egit:fetch(R)),
         ?assertEqual(ok, egit:pull(R)),
-        ?assertEqual(ok, egit:checkout(R, <<"main">>))
+        ?assertEqual(ok, egit:checkout(R, <<"main">>)),
+        ?assertEqual([], os:cmd("echo \"\n\" >> /tmp/egit/README.md")),
+        ?assertEqual(
+          #{mode => dry_run, files => [<<"README.md">>]},
+          egit:add(R, <<".">>, [verbose, dry_run])),
+        ?assertEqual(
+          #{mode => added, files => [<<"README.md">>]},
+          egit:add(R, <<".">>, [verbose])),
+        ?assertEqual(
+          #{mode => none,files => []},
+          egit:add(R, <<".">>, [verbose])),
+        {ok, OID} = egit:commit(R, <<"Test commit">>),
+        ?assertEqual({ok, nil}, egit:commit(R, <<"Test commit">>)),
+        ?assertMatch(#{oid := OID}, egit:rev_parse(R, <<"HEAD">>)),
+        ?assertMatch(#{oid := OID}, egit:rev_parse(R, <<"HEAD^2">>)),
       end
     ]}.
 

@@ -7,6 +7,18 @@ This project is an Erlang NIF wrapper to `libgit2` library.
 The project is currently in the alpha stage and more functionality is being
 added.
 
+## Currently supported functionality
+
+- Clone a repository
+- Open a repository at given local path
+- Fetch from remote
+- Pull from remote
+- Add files to repository
+- Checkout
+- Cat-file
+- Commit
+- Rev-parse
+
 ## Installation
 
 - Make sure you have `libgit2` installed.
@@ -39,7 +51,7 @@ end
 
 ## Usage
 
-Include 
+Include
 To clone a repository, give it a URL and a local path:
 ```erlang
 1> Repo = egit:clone("http://github.com/saleyn/egit.git", "/tmp").

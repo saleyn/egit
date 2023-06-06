@@ -1,5 +1,6 @@
 #pragma once
 
+static ERL_NIF_TERM ATOM_ADDED;
 static ERL_NIF_TERM ATOM_ALL;
 static ERL_NIF_TERM ATOM_AUTHOR;
 static ERL_NIF_TERM ATOM_BADARG;
@@ -8,19 +9,26 @@ static ERL_NIF_TERM ATOM_CHMOD_CALLS;
 static ERL_NIF_TERM ATOM_COMMIT;
 static ERL_NIF_TERM ATOM_COMMITTER;
 static ERL_NIF_TERM ATOM_DIR;
+static ERL_NIF_TERM ATOM_DRY_RUN;
 static ERL_NIF_TERM ATOM_ENCODING;
 static ERL_NIF_TERM ATOM_ENOCALLBACK;
 static ERL_NIF_TERM ATOM_ENOMEM;
 static ERL_NIF_TERM ATOM_ENOPROCESS;
 static ERL_NIF_TERM ATOM_ERROR;
 static ERL_NIF_TERM ATOM_FALSE;
+static ERL_NIF_TERM ATOM_FILES;
 static ERL_NIF_TERM ATOM_FETCH;
+static ERL_NIF_TERM ATOM_FROM;
 static ERL_NIF_TERM ATOM_FORCE;
 static ERL_NIF_TERM ATOM_HEADER;
+static ERL_NIF_TERM ATOM_MERGE_BASE;
 static ERL_NIF_TERM ATOM_MESSAGE;
+static ERL_NIF_TERM ATOM_MODE;
 static ERL_NIF_TERM ATOM_MKDIR_CALLS;
 static ERL_NIF_TERM ATOM_NIL;
+static ERL_NIF_TERM ATOM_NONE;
 static ERL_NIF_TERM ATOM_OBJECT;
+static ERL_NIF_TERM ATOM_OID;
 static ERL_NIF_TERM ATOM_OK;
 static ERL_NIF_TERM ATOM_PARENTS;
 static ERL_NIF_TERM ATOM_PERF;
@@ -32,15 +40,18 @@ static ERL_NIF_TERM ATOM_TAG;
 static ERL_NIF_TERM ATOM_TAGGER;
 static ERL_NIF_TERM ATOM_TIME;
 static ERL_NIF_TERM ATOM_TIME_OFFSET;
+static ERL_NIF_TERM ATOM_TO;
 static ERL_NIF_TERM ATOM_TOTAL_STEPS;
 static ERL_NIF_TERM ATOM_TREE;
 static ERL_NIF_TERM ATOM_TREE_ID;
 static ERL_NIF_TERM ATOM_TRUE;
 static ERL_NIF_TERM ATOM_TYPE;
+static ERL_NIF_TERM ATOM_UPDATE;
 static ERL_NIF_TERM ATOM_VERBOSE;
 
 inline void init_atoms(ErlNifEnv* env)
 {
+  ATOM_ADDED       = enif_make_atom(env, "added");
   ATOM_ALL         = enif_make_atom(env, "all");
   ATOM_AUTHOR      = enif_make_atom(env, "author");
   ATOM_BADARG      = enif_make_atom(env, "badarg");
@@ -48,7 +59,8 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_CHMOD_CALLS = enif_make_atom(env, "chmod_calls");
   ATOM_COMMIT      = enif_make_atom(env, "commit");
   ATOM_COMMITTER   = enif_make_atom(env, "committer");
-  ATOM_DIR         = enif_make_atom(env, "show_dir");
+  ATOM_DIR         = enif_make_atom(env, "dir");
+  ATOM_DRY_RUN     = enif_make_atom(env, "dry_run");
   ATOM_ENCODING    = enif_make_atom(env, "encoding");
   ATOM_ENOCALLBACK = enif_make_atom(env, "enocallback");
   ATOM_ENOMEM      = enif_make_atom(env, "enomem");
@@ -56,12 +68,18 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_ERROR       = enif_make_atom(env, "error");
   ATOM_FALSE       = enif_make_atom(env, "false");
   ATOM_FORCE       = enif_make_atom(env, "force");
+  ATOM_FROM        = enif_make_atom(env, "from");
   ATOM_FETCH       = enif_make_atom(env, "fetch");
+  ATOM_FILES       = enif_make_atom(env, "files");
   ATOM_HEADER      = enif_make_atom(env, "header");
+  ATOM_MODE        = enif_make_atom(env, "mode");
   ATOM_MESSAGE     = enif_make_atom(env, "message");
+  ATOM_MERGE_BASE  = enif_make_atom(env, "merge_base");
   ATOM_MKDIR_CALLS = enif_make_atom(env, "mkdir_calls");
   ATOM_NIL         = enif_make_atom(env, "nil");
+  ATOM_NONE        = enif_make_atom(env, "none");
   ATOM_OBJECT      = enif_make_atom(env, "object");
+  ATOM_OID         = enif_make_atom(env, "oid");
   ATOM_OK          = enif_make_atom(env, "ok");
   ATOM_PARENTS     = enif_make_atom(env, "parents");
   ATOM_PERF        = enif_make_atom(env, "perf");
@@ -73,10 +91,12 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_TAGGER      = enif_make_atom(env, "tagger");
   ATOM_TIME        = enif_make_atom(env, "time");
   ATOM_TIME_OFFSET = enif_make_atom(env, "time_offset");
+  ATOM_TO          = enif_make_atom(env, "to");
   ATOM_TOTAL_STEPS = enif_make_atom(env, "total_steps");
   ATOM_TREE        = enif_make_atom(env, "tree");
   ATOM_TREE_ID     = enif_make_atom(env, "tree_id");
   ATOM_TRUE        = enif_make_atom(env, "true");
   ATOM_TYPE        = enif_make_atom(env, "type");
+  ATOM_UPDATE      = enif_make_atom(env, "update");
   ATOM_VERBOSE     = enif_make_atom(env, "verbose");
 }

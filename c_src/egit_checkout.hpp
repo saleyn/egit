@@ -43,65 +43,25 @@ struct checkout_stats {
   int chmod_calls;
 };
 
-static ERL_NIF_TERM
-parse_opts(ErlNifEnv* env, ERL_NIF_TERM list, checkout_options& o)
-{
-  ERL_NIF_TERM opt;
-
-  while (enif_get_list_cell(env, list, &opt, &list)) {
-    if      (enif_is_identical(opt, ATOM_VERBOSE)) o.verbose = true;
-    else if (enif_is_identical(opt, ATOM_PERF))    o.perf    = true;
-    else if (enif_is_identical(opt, ATOM_FORCE))   o.force   = true;
-    else [[unlikely]]
-      return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, opt));
-  }
-
-  return 0;
-}
-
-// This function is called to report progression, ie. it's called once with
-// a NULL path and the number of total steps, then for each subsequent path,
-// the current completed_step value.
-static void save_checkout_progress(const char* path, size_t completed_steps, size_t total_steps, void* payload)
-{
-  auto stats = static_cast<checkout_stats*>(payload);
-
-  if (payload)
-    stats->total_steps = total_steps;
-}
-
-// This function is called when the checkout completes, and is used to report the
-// number of syscalls performed.
-static void save_perf_data(const git_checkout_perfdata* perfdata, void* payload)
-{
-  auto stats = static_cast<checkout_stats*>(payload);
-
-  if (stats) {
-    stats->stat_calls  = perfdata->stat_calls;
-    stats->mkdir_calls = perfdata->mkdir_calls;
-    stats->chmod_calls = perfdata->chmod_calls;
-  }
-}
-
 int resolve_refish(git_annotated_commit** commit, git_repository* repo, const char* refish)
 {
-	assert(commit != NULL);
+  assert(commit != NULL);
 
   SmartPtr<git_reference> ref(git_reference_free);
 
-	int err =  git_reference_dwim(&ref, repo, refish);
-	if (err == GIT_OK) {
-		git_annotated_commit_from_ref(commit, repo, ref);
-		return GIT_OK;
-	}
+  int err =  git_reference_dwim(&ref, repo, refish);
+  if (err == GIT_OK) {
+    git_annotated_commit_from_ref(commit, repo, ref);
+    return GIT_OK;
+  }
 
   SmartPtr<git_object> obj(git_object_free);
 
-	err = git_revparse_single(&obj, repo, refish);
-	if (err == GIT_OK)
-		err = git_annotated_commit_lookup(commit, repo, git_object_id(obj));
+  err = git_revparse_single(&obj, repo, refish);
+  if (err == GIT_OK)
+    err = git_annotated_commit_lookup(commit, repo, git_object_id(obj));
 
-	return err;
+  return err;
 }
 
 // This corresponds to `git switch --guess`: if a given ref does
@@ -120,15 +80,15 @@ static int guess_refish(git_annotated_commit** out, git_repository* repo, const 
   if ((err = git_remote_list(&remotes, repo)) < 0)
     return err;
 
-	auto cleanup = [&remotes]() { git_strarray_dispose(&remotes); };
-	ScopeCleanup scope(cleanup);
+  auto cleanup = [&remotes]() { git_strarray_dispose(&remotes); };
+  ScopeCleanup scope(cleanup);
 
   SmartPtr<git_reference> remote_ref(git_reference_free);
 
   for (size_t i = 0; i < remotes.count; i++) {
-		auto refname = std::format("refs/remotes/{}/{}", remotes.strings[i], ref);
+    auto refname = std::format("refs/remotes/{}/{}", remotes.strings[i], ref);
     if ((err = git_reference_lookup(&remote_ref, repo, refname.c_str())) < 0 && err != GIT_ENOTFOUND)
-	    break;
+      break;
   }
 
   if (!remote_ref)
@@ -137,18 +97,26 @@ static int guess_refish(git_annotated_commit** out, git_repository* repo, const 
   return git_annotated_commit_from_ref(out, repo, remote_ref);
 }
 
-/** That example's entry point */
-ERL_NIF_TERM checkout(ErlNifEnv* env, git_repository* repo, std::string const& rev, ERL_NIF_TERM opts)
+// Implementation of checkout logic
+ERL_NIF_TERM lg2_checkout(ErlNifEnv* env, git_repository* repo, std::string const& rev, ERL_NIF_TERM opts)
 {
   checkout_options o;
   int err = 0;
 
-  auto res = parse_opts(env, opts, o);
+  // Parse options
+  {
+    ERL_NIF_TERM opt;
 
-  if (res != 0) [[unlikely]]
-    return res;
+    while (enif_get_list_cell(env, opts, &opt, &opts)) {
+      if      (enif_is_identical(opt, ATOM_VERBOSE)) o.verbose = true;
+      else if (enif_is_identical(opt, ATOM_PERF))    o.perf    = true;
+      else if (enif_is_identical(opt, ATOM_FORCE))   o.force   = true;
+      else [[unlikely]]
+        return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, opt));
+    }
+  }
 
-  /** Make sure we're not about to checkout while something else is going on */
+  // Make sure we're not about to checkout while something else is going on
   auto state = git_repository_state(repo);
   if (state != GIT_REPOSITORY_STATE_NONE)
     return make_error(env, "Repository is in unexpected state " + std::to_string(state));
@@ -162,20 +130,50 @@ ERL_NIF_TERM checkout(ErlNifEnv* env, git_repository* repo, std::string const& r
 
   checkout_stats stats{};
 
+  // This function is called to report progression, ie. it's called once with
+  // a NULL path and the number of total steps, then for each subsequent path,
+  // the current completed_step value.
+  auto save_checkout_progress =
+    [](const char* path, size_t completed_steps, size_t total_steps, void* payload)
+    {
+      auto stats = static_cast<checkout_stats*>(payload);
+
+      if (payload)
+        stats->total_steps = total_steps;
+    };
+
+  // This function is called when the checkout completes, and is used to report the
+  // number of syscalls performed.
+  auto save_perf_data =
+    [](const git_checkout_perfdata* perfdata, void* payload)
+    {
+      auto stats = static_cast<checkout_stats*>(payload);
+
+      if (stats) {
+        stats->stat_calls  = perfdata->stat_calls;
+        stats->mkdir_calls = perfdata->mkdir_calls;
+        stats->chmod_calls = perfdata->chmod_calls;
+      }
+    };
+
   // This is the main "checkout <branch>" logic, responsible for performing
   // a branch-based checkout.
   git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
   checkout_opts.checkout_strategy    = o.force ? GIT_CHECKOUT_FORCE : GIT_CHECKOUT_SAFE;
-  checkout_opts.progress_cb          = o.verbose ? save_checkout_progress : nullptr;
-  checkout_opts.perfdata_cb          = o.verbose && o.perf ? save_perf_data : nullptr;
-  checkout_opts.progress_payload     = o.verbose ? &stats  : nullptr;
-  checkout_opts.perfdata_payload     = o.verbose ? &stats  : nullptr;
+  if (o.verbose) {
+    checkout_opts.progress_cb        = save_checkout_progress;
+    checkout_opts.progress_payload   = &stats;
+    if (o.perf) {
+      checkout_opts.perfdata_cb      = save_perf_data;
+      checkout_opts.perfdata_payload = &stats;
+    }
+  }
 
   SmartPtr<git_commit> target_commit(git_commit_free);
 
   /// Grab the commit we're interested to move to
   if (git_commit_lookup(&target_commit, repo, git_annotated_commit_id(target.get())) < 0)
-		return make_git_error(env, "Failed to lookup commit");
+    return make_git_error(env, "Failed to lookup commit");
 
   // Perform the checkout so the workdir corresponds to what target_commit
   // contains.
@@ -189,24 +187,24 @@ ERL_NIF_TERM checkout(ErlNifEnv* env, git_repository* repo, std::string const& r
   //
   // Depending on the "origin" of target (ie. it's an OID or a branch name),
   // we might need to detach HEAD.
-	auto annotated_ref = git_annotated_commit_ref(target);
+  auto annotated_ref = git_annotated_commit_ref(target);
 
   if (!annotated_ref)
-		err = git_repository_set_head_detached_from_annotated(repo, target) != GIT_OK;
-	else {
+    err = git_repository_set_head_detached_from_annotated(repo, target) != GIT_OK;
+  else {
     const char* target_head;
 
-	  SmartPtr<git_reference> ref(git_reference_free);
-	  SmartPtr<git_reference> branch(git_reference_free);
+    SmartPtr<git_reference> ref(git_reference_free);
+    SmartPtr<git_reference> branch(git_reference_free);
 
     if (git_reference_lookup(&ref, repo, annotated_ref) != GIT_OK)
       return make_git_error(env, "Failed to lookup annotated HEAD reference");
 
     if (!git_reference_is_remote(ref))
       target_head = annotated_ref;
-		else if (git_branch_create_from_annotated(&branch, repo, rev.c_str(), target, 0) < 0)
+    else if (git_branch_create_from_annotated(&branch, repo, rev.c_str(), target, 0) < 0)
       return make_git_error(env, "Failed to update HEAD reference from remote branch");
-		else
+    else
       target_head = git_reference_name(branch);
 
     err = git_repository_set_head(repo, target_head) != GIT_OK;

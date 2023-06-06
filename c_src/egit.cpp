@@ -19,8 +19,11 @@ namespace std { using namespace fmt; }
 
 #include <git2.h>
 #include "egit_utils.hpp"
+#include "egit_add.hpp"
 #include "egit_cat_file.hpp"
 #include "egit_checkout.hpp"
+#include "egit_commit.hpp"
+#include "egit_rev_parse.hpp"
 
 static ErlNifResourceType* GIT_REPO_RESOURCE;
 
@@ -267,7 +270,7 @@ static ERL_NIF_TERM cat_file_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
 
   std::string filename((char*)bin.data, bin.size);
 
-  return cat_file(env, repo->get(), filename, argv[2]);
+  return lg2_cat_file(env, repo->get(), filename, argv[2]);
 }
 
 static ERL_NIF_TERM checkout_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
@@ -287,7 +290,51 @@ static ERL_NIF_TERM checkout_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
 
   std::string rev((char*)bin.data, bin.size);
 
-  return checkout(env, repo->get(), rev, argv[2]);
+  return lg2_checkout(env, repo->get(), rev, argv[2]);
+}
+
+static ERL_NIF_TERM add_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[1]) || !enif_is_list(env, argv[2])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_add(env, repo->get(), argv[1], argv[2]);
+}
+
+static ERL_NIF_TERM commit_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 1);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_commit(env, repo->get(), std::string((const char*)bin.data, bin.size));
+}
+
+static ERL_NIF_TERM rev_parse_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_rev_parse(env, repo->get(), std::string((const char*)bin.data, bin.size));
 }
 
 static void resource_dtor(ErlNifEnv* env, void* arg)
@@ -328,8 +375,11 @@ static ErlNifFunc egit_funcs[] =
   {"open",          1, open_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"fetch_or_pull", 2, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"fetch_or_pull", 3, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"add_nif",       3, add_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"checkout",      3, checkout_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"commit",        2, commit_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"cat_file",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"rev_parse",     2, rev_parse_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"commit_lookup", 3, commit_lookup_nif, 0},
 };
 

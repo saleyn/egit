@@ -54,6 +54,15 @@ private:
   T m_fun;
 };
 
+inline std::string oid_to_str(git_oid const& oid)
+{
+  auto out = std::string(GIT_OID_SHA1_HEXSIZE, '\0');
+  git_oid_tostr(out.data(), out.size(), &oid);
+  return out;
+}
+
+inline std::string oid_to_str(git_oid const* oid) { return oid_to_str(*oid); }
+
 inline std::tuple<ERL_NIF_TERM, unsigned char*>
 make_binary(ErlNifEnv* env, size_t size)
 {
@@ -75,10 +84,12 @@ inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx)
   const char* delim = "";
   const char* err   = "";
 
-  if (git_error_last()) {
-    err   = git_error_last()->message;
+  if (git_error_last())
+    err = git_error_last()->message;
+
+  if (git_error_last() && !pfx.empty())
     delim = ": ";
-  }
+
   snprintf(buf, sizeof(buf), "%s%s%s", pfx.c_str(), delim, err);
   return make_binary(env, buf);
 }
@@ -96,4 +107,9 @@ inline ERL_NIF_TERM make_git_error(ErlNifEnv* env, std::string const& pfx)
 inline ERL_NIF_TERM make_error(ErlNifEnv* env, std::string_view const& err)
 {
   return enif_make_tuple2(env, ATOM_ERROR, make_binary(env, err));
+}
+
+inline ERL_NIF_TERM make_error(ErlNifEnv* env, ERL_NIF_TERM err)
+{
+  return enif_make_tuple2(env, ATOM_ERROR, err);
 }
