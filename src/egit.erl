@@ -181,6 +181,7 @@ clone_test_() ->
   {setup,
     fun()  -> ok end,
     fun(_) ->
+      %% Only delete the directory if test cases succeeded
       persistent_term:get(egit, undefined) == ok andalso file:del_dir_r("/tmp/egit"),
       persistent_term:erase({egit, repo}),
       persistent_term:erase({egit, head}),
