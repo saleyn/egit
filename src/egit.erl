@@ -173,8 +173,7 @@ clone_test_() ->
           egit:add(R, <<".">>, [verbose])),
         {ok, OID} = egit:commit(R, <<"Test commit">>),
         ?assertEqual({ok, nil}, egit:commit(R, <<"Test commit">>)),
-        ?assertMatch(#{oid := OID}, egit:rev_parse(R, <<"HEAD">>)),
-        ?assertMatch(#{oid := OID}, egit:rev_parse(R, <<"HEAD^2">>)),
+        ?assertMatch(#{oid := OID}, egit:rev_parse(R, <<"HEAD">>))
       end
     ]}.
 

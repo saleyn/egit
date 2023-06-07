@@ -32,5 +32,9 @@ jobs:
         apt-get update -y && apt-get install -y libgit2-dev
     - name: Compile
       run:  make
+    - name: Set git credentials
+      run: |
+        git config --global user.name "Test User"
+        git config --global user.email "test@gmail.com"
     - name: Run tests
       run:  make test

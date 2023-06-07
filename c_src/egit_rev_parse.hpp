@@ -28,17 +28,17 @@ ERL_NIF_TERM lg2_rev_parse(ErlNifEnv* env, git_repository* repo, std::string con
   std::vector<ERL_NIF_TERM> keys;
   std::vector<ERL_NIF_TERM> vals;
 
-  if ((rs.flags & GIT_REVSPEC_SINGLE) != 0) {
+  if ((rs.flags & GIT_REVPARSE_SINGLE) != 0) {
     keys.push_back(ATOM_OID);
     vals.push_back(make_binary(env, oid_to_str(git_object_id(rs.from))));
     git_object_free(rs.from);
   }
-  else if ((rs.flags & GIT_REVSPEC_RANGE) != 0) {
+  else if ((rs.flags & GIT_REVPARSE_RANGE) != 0) {
     keys.push_back(ATOM_TO);
     vals.push_back(make_binary(env, oid_to_str(git_object_id(rs.to))));
     git_object_free(rs.to);
 
-    if ((rs.flags & GIT_REVSPEC_MERGE_BASE) != 0) {
+    if ((rs.flags & GIT_REVPARSE_MERGE_BASE) != 0) {
       git_oid base;
       if (git_merge_base(&base, repo, git_object_id(rs.from), git_object_id(rs.to)) != GIT_OK)
         return make_git_error(env, "Could not find merge base " + spec);
