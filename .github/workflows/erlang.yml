@@ -22,19 +22,15 @@ jobs:
         fetch-depth: 0
     - name: Install latest g++
       run: |
-        # apt update && apt-get install -y software-properties-common
-        # apt-get install -y g++-10
-        ls -l /usr/bin/g++*
+        # ls -l /usr/bin/g++*
         update-alternatives --install /usr/bin/g++ g++ /usr/bin/gcc-10 100
         g++ --version
+        git config --global user.name "Test User"
+        git config --global user.email "test@gmail.com"
     - name: Install libgit2
       run: |
         apt-get update -y && apt-get install -y libgit2-dev
     - name: Compile
       run:  make
-    - name: Set git credentials
-      run: |
-        git config --global user.name "Test User"
-        git config --global user.email "test@gmail.com"
     - name: Run tests
       run:  make test
