@@ -2,7 +2,9 @@
 
 [![build](https://github.com/saleyn/egit/actions/workflows/erlang.yml/badge.svg)](https://github.com/saleyn/egit/actions/workflows/erlang.yml)
 
-This project is an Erlang NIF wrapper to `libgit2` library.
+This project is an Erlang NIF wrapper to `libgit2` library. It allows to
+execute commands to access and manage a `git` repository without depending
+on the external `git` tool.
 
 The project is currently in the alpha stage and more functionality is being
 added.
@@ -14,9 +16,9 @@ added.
 - Fetch from remote
 - Pull from remote
 - Add files to repository
+- Commit
 - Checkout
 - Cat-file
-- Commit
 - Rev-parse
 
 ## Installation
@@ -82,6 +84,14 @@ After obtaining a repository reference, you can call functions in the
                    -14400},
               parents => []}}}
 ```
+
+## Patching
+
+If you find some functionality lacking, feel free to add missing functions
+and submit a PR.  The implementation recommendation would be to use one of
+the (examples)[https://github.com/libgit2/libgit2/tree/main/examples]
+providd with `libgit2`, add it as `c_src/egit_*.hpp`, and modify `egit.cpp`
+accordingly.
 
 ## Author
 

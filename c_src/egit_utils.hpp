@@ -57,7 +57,7 @@ private:
 inline std::string oid_to_str(git_oid const& oid)
 {
   auto out = std::string(GIT_OID_SHA1_HEXSIZE, '\0');
-  git_oid_tostr(out.data(), out.size(), &oid);
+  git_oid_tostr(out.data(), out.size()+1, &oid);
   return out;
 }
 

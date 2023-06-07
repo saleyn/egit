@@ -126,8 +126,30 @@ add(Repo, PathSpecs, Opts) when is_reference(Repo), is_list(PathSpecs), is_list(
 commit(_Repo, Comment) when is_binary(Comment) ->
   ?NOT_LOADED_ERROR.
 
-%% @doc Reverse parse a reference
--spec rev_parse(repository(), binary()) -> map() | {error, binary()|atom()}.
+%% @doc Reverse parse a reference.
+%% See [https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions]
+%% for the formats of a `Spec'.
+%%
+%% When a reference refers to a single object, an ok tuple with a binary
+%% string of the commit hash is returned.  When it refers to a range
+%% (e.g. `HEAD..HEAD~2`), a map is returned with `from' and `to' keys.
+%% When using a Symmetric Difference Notation `...' (i.e. `HEAD...HEAD~4'),
+%% a map with three keys `from', `to', and `merge_base' is returned.
+%%
+%% Examples:
+%% ```
+%% 2> egit:rev_parse(R,<<"HEAD~4">>).
+%% {ok, <<"f5035e0341d00e8f4b5e36356571e7754e3e447"...>>}
+%% 3> egit:rev_parse(R,<<"HEAD..HEAD~4">>).
+%% #{from => <<"24ffd5825abcfb74363a91ac28379add925ac65"...>>,
+%%   to => <<"f5035e0341d00e8f4b5e36356571e7754e3e447"...>>}
+%% 4> egit:rev_parse(R,<<"HEAD...HEAD~4">>).
+%% #{from => <<"24ffd5825abcfb74363a91ac28379add925ac65"...>>,
+%%   merge_base =>
+%%       <<"f5035e0341d00e8f4b5e36356571e7754e3e447"...>>,
+%%   to => <<"f5035e0341d00e8f4b5e36356571e7754e3e447"...>>}
+%% '''
+-spec rev_parse(repository(), binary()) -> {ok, binary()} | map() | {error, binary()|atom()}.
 rev_parse(_Repo, Spec) when is_binary(Spec) ->
   ?NOT_LOADED_ERROR.
 
@@ -151,12 +173,21 @@ add_nif(Repo, PathSpecs, Opts) when is_reference(Repo), is_list(PathSpecs), is_l
 -ifdef(EUNIT).
 
 clone_test_() ->
+  file:del_dir_r("/tmp/egit"),
+  R = egit:clone(<<"https://github.com/saleyn/egit.git">>, <<"/tmp/egit">>),
+  {ok, OID0} = egit:rev_parse(R, <<"HEAD">>),
+  persistent_term:put({egit, repo}, R),
+  persistent_term:put({egit, head}, OID0),
   {setup,
-    fun()  -> file:del_dir_r("/tmp/egit"), ok end,
-    fun(_) -> file:del_dir_r("/tmp/egit"), ok end,
+    fun()  -> ok end,
+    fun(_) ->
+      persistent_term:get(egit, undefined) == ok andalso file:del_dir_r("/tmp/egit"),
+      persistent_term:erase({egit, repo}),
+      persistent_term:erase({egit, head}),
+      persistent_term:erase(egit)
+    end,
     [
       fun() ->
-        R = egit:clone(<<"https://github.com/saleyn/egit.git">>, <<"/tmp/egit">>),
         ?assert(is_reference(R)),
         ?assertEqual(ok, egit:fetch(R)),
         ?assertEqual(ok, egit:pull(R)),
@@ -171,10 +202,22 @@ clone_test_() ->
         ?assertEqual(
           #{mode => none,files => []},
           egit:add(R, <<".">>, [verbose])),
-        {ok, OID} = egit:commit(R, <<"Test commit">>),
+        {ok, OID0} = egit:rev_parse(R, <<"HEAD">>),
+        Res        = egit:commit(R, <<"Test commit">>),
+        ?assertMatch({ok, _}, Res),
+        {ok, OID}  = Res,
         ?assertEqual({ok, nil}, egit:commit(R, <<"Test commit">>)),
-        ?assertMatch(#{oid := OID}, egit:rev_parse(R, <<"HEAD">>))
-      end
+        ?assertEqual({ok, OID}, egit:rev_parse(R, <<"HEAD">>))
+      end,
+      fun() ->
+        Res = egit:rev_parse(R, <<"HEAD">>),
+        ?assertMatch({ok, OID} when is_binary(OID), Res),
+        {ok, OID} = Res,
+        ?assertEqual(#{to => OID0, from => OID}, egit:rev_parse(R, <<"HEAD..HEAD~1">>)),
+        ?assertEqual(#{to => OID0, from => OID, merge_base => OID0}, egit:rev_parse(R, <<"HEAD...HEAD~1">>)),
+        ?assertMatch({error, _}, egit:rev_parse(R, <<"HEAD~x">>))
+      end,
+      fun() -> persistent_term:put(egit, ok) end
     ]}.
 
 -endif.
