@@ -20,6 +20,7 @@ added.
 - Checkout
 - Cat-file
 - Rev-parse
+- Rev-list
 
 ## Installation
 
@@ -89,8 +90,8 @@ After obtaining a repository reference, you can call functions in the
 
 If you find some functionality lacking, feel free to add missing functions
 and submit a PR.  The implementation recommendation would be to use one of
-the (examples)[https://github.com/libgit2/libgit2/tree/main/examples]
-providd with `libgit2`, add it as `c_src/egit_*.hpp`, and modify `egit.cpp`
+the [examples](https://github.com/libgit2/libgit2/tree/main/examples)
+provided with `libgit2`, add it as `c_src/egit_*.hpp`, and modify `egit.cpp`
 accordingly.
 
 ## Author

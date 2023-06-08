@@ -17,6 +17,10 @@ namespace std { using namespace fmt; }
 #define GIT_OID_SHA1_HEXSIZE GIT_OID_HEXSZ
 #endif
 
+#ifndef GIT_REVSPEC_MERGE_BASE
+#define GIT_REVSPEC_MERGE_BASE GIT_REVPARSE_MERGE_BASE
+#endif
+
 #include <git2.h>
 #include "egit_utils.hpp"
 #include "egit_add.hpp"
