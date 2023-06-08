@@ -9,6 +9,8 @@ ERL_LDFLAGS  ?= $(shell erl -noshell -noinput -eval "io:format(\"-L~ts\", [code:
 DEBUG     ?= 0
 NIF_DEBUG ?= $(DEBUG)
 
+NIF_PRINT := $(if $(NIF_PRINT),-DNIF_DEBUG)
+
 CXX       ?= g++
 
 CXX_VSN   ?= $(shell $(CXX) --version | sed -n '1s/^[^0-9]\+\([0-9]\+\)\(.[0-9-]\)\+.*$$/\1/p')
@@ -63,7 +65,7 @@ SO_OUTPUT  ?= $(BASEDIR)/priv/$(PROJECT).so
 SOURCES    := $(wildcard $(SRC_DIR)/*.cpp)
 OBJECTS     = $(addsuffix .o, $(basename $(SOURCES)))
 
-COMPILE_CPP = $(CXX) $(CXXFLAGS) $(CPPFLAGS) -c
+COMPILE_CPP = $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(NIF_PRINT) -c
 
 # Targets
 
@@ -71,6 +73,11 @@ all: $(SO_OUTPUT)
 
 clean:
 	rm -f $(SO_OUTPUT) *.o
+
+info:
+	@echo NIF_PRINT=$(NIF_PRINT)
+	@echo NIF_DEBUG=$(NIF_DEBUG)
+	@echo COMPILE_CPP=$(COMPILE_CPP)
 
 $(SO_OUTPUT): $(OBJECTS)
 	@mkdir -p $(BASEDIR)/priv/

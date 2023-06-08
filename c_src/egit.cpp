@@ -24,12 +24,18 @@ namespace std { using namespace fmt; }
 #include "egit_checkout.hpp"
 #include "egit_commit.hpp"
 #include "egit_rev_parse.hpp"
+#include "egit_rev_list.hpp"
 
 static ErlNifResourceType* GIT_REPO_RESOURCE;
 
 struct GitRepoPtr {
   static GitRepoPtr* create(git_repository* p) {
     auto rp = static_cast<GitRepoPtr*>(enif_alloc_resource(GIT_REPO_RESOURCE, sizeof(GitRepoPtr)));
+
+    #ifdef NIF_DEBUG
+    fprintf(stderr, "=egit=> Allocated NIF resource %p (%p) [%d]\r\n", p, rp, __LINE__);
+    #endif
+
     if (!rp) [[unlikely]]
       return nullptr;
 
@@ -37,33 +43,34 @@ struct GitRepoPtr {
     return rp;
   }
 
-  ~GitRepoPtr() { if (m_ptr) { git_repository_free(m_ptr); m_ptr = nullptr; } }
+  ~GitRepoPtr() {
+    if (m_ptr) {
+      #ifdef NIF_DEBUG
+      fprintf(stderr, "=egit=> Releasing repository pointer %p (%p) [%d]\r\n", m_ptr, this, __LINE__);
+      #endif
+      git_repository_free(m_ptr);
+      m_ptr = nullptr;
+    }
+  }
 
   git_repository const* get() const { return m_ptr; }
   git_repository*       get()       { return m_ptr; }
+
+  ERL_NIF_TERM to_enif_resource(ErlNifEnv* env) {
+    ERL_NIF_TERM resource = enif_make_resource(env, (void*)this);
+
+    #ifdef NIF_DEBUG
+    fprintf(stderr, "=egit=> Moved repo ownership %p [%d]\r\n", this, __LINE__);
+    #endif
+
+    enif_release_resource((void*)this); // Grant ownership to the resource
+    return resource;
+  }
 
 private:
   GitRepoPtr(git_repository* p) : m_ptr(p) {}
 
   git_repository* m_ptr;
-};
-
-struct GitCommit {
-  explicit GitCommit(git_commit* p = nullptr) : m_ptr(p) {}
-  ~GitCommit() {
-    if (m_ptr) {
-      git_commit_free(m_ptr);
-      m_ptr = nullptr;
-    }
-  }
-
-  git_commit const* get() const { return m_ptr; }
-  git_commit*       get()       { return m_ptr; }
-  git_commit**      ptr()       { assert(!m_ptr); return &m_ptr; }
-
-  git_commit const* operator->() const { return m_ptr; }
-private:
-  git_commit* m_ptr;
 };
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
@@ -76,6 +83,11 @@ static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 
   if (!rp) [[unlikely]] {
     assert(p);
+
+    #ifdef NIF_DEBUG
+    fprintf(stderr, "=egit=> Freeing repo %p [%d]\r\n", p, __LINE__);
+    #endif
+
     git_repository_free(p);
     return enif_raise_exception(env, ATOM_ENOMEM);
   }
@@ -83,6 +95,11 @@ static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
   auto result = enif_monitor_process(env, rp, &pid, &mon);
 
   if (result != 0) [[unlikely]] {
+    #ifdef NIF_DEBUG
+    fprintf(stderr, "=egit=> Freeing repo %p (result=%d) [%d]\r\n", rp, result, __LINE__);
+    #endif
+    git_repository_free(p);
+
     if (result > 0) {
       // Process no longer alive
       return enif_raise_exception(env, ATOM_ENOPROCESS);
@@ -93,10 +110,7 @@ static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
     }
   }
 
-  ERL_NIF_TERM resource = enif_make_resource(env, (void*)rp);
-  enif_release_resource((void*)rp); // Grant ownership to the resource
-
-  return resource;
+  return rp->to_enif_resource(env);
 }
 
 static ERL_NIF_TERM oid_to_bin(ErlNifEnv* env, git_oid const* oid, size_t len = GIT_OID_SHA1_HEXSIZE)
@@ -119,7 +133,7 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   ErlNifBinary bsha;
 
   if (!enif_inspect_binary(env, argv[1], &bsha)) [[unlikely]]
-    return enif_make_badarg(env);
+    return raise_badarg_exception(env, argv[1]);
 
   std::string sha((char*)bsha.data, bsha.size);
 
@@ -150,12 +164,10 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   };
 
   // Smart pointer that will automatically free the commit object
-  GitCommit pcommit;
+  SmartPtr<git_commit> commit(git_commit_free);
 
-  if (git_commit_lookup(pcommit.ptr(), repo->get(), &oid) < 0)
-    return raise_git_error(env, "Failed to find git commit " + sha);
-
-  auto commit = pcommit.get();
+  if (git_commit_lookup(&commit, repo->get(), &oid) < 0)
+    return raise_git_exception(env, "Failed to find git commit " + sha);
 
   ERL_NIF_TERM  head, list = argv[2];
 
@@ -195,7 +207,11 @@ static ERL_NIF_TERM clone_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
   git_repository* p{};
 
   if (git_clone(&p, surl.c_str(), spath.c_str(), nullptr) < 0) [[unlikely]]
-    return raise_git_error(env, "Failed to clone git repo " + surl);
+    return raise_git_exception(env, "Failed to clone git repo " + surl);
+
+  #ifdef NIF_DEBUG
+  fprintf(stderr, "=egit=> Cloned repo %p [%d]\r\n", p, __LINE__);
+  #endif
 
   return to_monitored_resource(env, p);
 }
@@ -213,7 +229,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
   git_repository* p{};
 
   if (git_repository_open(&p, spath.c_str()) < 0) [[unlikely]]
-    return raise_git_error(env, "Failed to open git repo " + spath);
+    return raise_git_exception(env, "Failed to open git repo " + spath);
 
   return to_monitored_resource(env, p);
 }
@@ -309,7 +325,7 @@ static ERL_NIF_TERM add_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 static ERL_NIF_TERM commit_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-  assert(argc == 1);
+  assert(argc == 2);
 
   GitRepoPtr* repo;
   if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
@@ -324,7 +340,7 @@ static ERL_NIF_TERM commit_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
 
 static ERL_NIF_TERM rev_parse_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-  assert(argc == 2);
+  assert(argc == 3);
 
   GitRepoPtr* repo;
   if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
@@ -334,19 +350,43 @@ static ERL_NIF_TERM rev_parse_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
   if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
     return enif_make_badarg(env);
 
-  return lg2_rev_parse(env, repo->get(), std::string((const char*)bin.data, bin.size));
+  if (!enif_is_list(env, argv[2])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_rev_parse(env, repo->get(), std::string((const char*)bin.data, bin.size), argv[2]);
+}
+
+static ERL_NIF_TERM rev_list_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[1])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[2])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_rev_list(env, repo->get(), argv[1], argv[2]);
 }
 
 static void resource_dtor(ErlNifEnv* env, void* arg)
 {
   assert(arg);
-  //fprintf(stderr, "--> Releasing resource %p\r\n", arg);
+  #ifdef NIF_DEBUG
+  fprintf(stderr, "=egit=> Releasing resource %p [%d]\r\n", arg, __LINE__);
+  #endif
   static_cast<GitRepoPtr*>(arg)->~GitRepoPtr();
 }
 
 static void resource_down(ErlNifEnv* env, void* obj, ErlNifPid*, ErlNifMonitor*)
 {
-  //fprintf(stderr, "--> Decrement resource ref %p\r\n", obj);
+  #ifdef NIF_DEBUG
+  fprintf(stderr, "=egit=> Decremented resource ref %p [%d]\r\n", obj, __LINE__);
+  #endif
   enif_release_resource(obj);
 }
 
@@ -356,7 +396,7 @@ static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 
   auto flags                 = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
   ErlNifResourceTypeInit rti = {.dtor = &resource_dtor, .down = &resource_down};
-  GIT_REPO_RESOURCE          = enif_open_resource_type_x(env, "git_repo_resource", &rti, flags, nullptr);
+  GIT_REPO_RESOURCE          = enif_open_resource_type_x(env, "git_repo_resource",  &rti, flags, nullptr);
 
   git_libgit2_init();
 
@@ -371,16 +411,17 @@ static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_N
 
 static ErlNifFunc egit_funcs[] =
 {
-  {"clone",         2, clone_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"open",          1, open_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"fetch_or_pull", 2, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"fetch_or_pull", 3, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"add_nif",       3, add_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"checkout",      3, checkout_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"commit",        2, commit_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"cat_file",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"rev_parse",     2, rev_parse_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"commit_lookup", 3, commit_lookup_nif, 0},
+  {"clone_nif",         2, clone_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"open_nif",          1, open_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"fetch_nif",         2, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"fetch_nif",         3, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"add_nif",           3, add_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"checkout_nif",      3, checkout_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"commit_nif",        2, commit_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"cat_file_nif",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"rev_parse_nif",     3, rev_parse_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"rev_list_nif",      3, rev_list_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"commit_lookup_nif", 3, commit_lookup_nif, 0},
 };
 
 ERL_NIF_INIT(egit, egit_funcs, load, NULL, upgrade, NULL);

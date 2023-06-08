@@ -18,8 +18,28 @@
 
 #include <git2/common.h>
 
-ERL_NIF_TERM lg2_rev_parse(ErlNifEnv* env, git_repository* repo, std::string const& spec)
+ERL_NIF_TERM lg2_rev_parse(
+  ErlNifEnv* env, git_repository* repo, std::string const& spec, ERL_NIF_TERM opts)
 {
+  int abbrev = GIT_OID_SHA1_HEXSIZE;
+  // Parse options
+  {
+    int arity, n;
+    ERL_NIF_TERM opt;
+    const ERL_NIF_TERM* tagvals;
+
+    while (enif_get_list_cell(env, opts, &opt, &opts)) {
+      if (enif_get_tuple(env, opt, &arity, &tagvals) && arity == 2) {
+        if (enif_is_identical(tagvals[0], ATOM_ABBREV) && enif_get_int(env, tagvals[1], &n) && n > 0 && n <= GIT_OID_SHA1_HEXSIZE)
+          abbrev = n;
+        else [[unlikely]]
+          return raise_badarg_exception(env, opt);
+      }
+      else [[unlikely]]
+        return raise_badarg_exception(env, opt);
+    }
+  }
+
   git_revspec rs;
 
   if (git_revparse(&rs, repo, spec.c_str()) != GIT_OK) [[unlikely]]
@@ -29,7 +49,7 @@ ERL_NIF_TERM lg2_rev_parse(ErlNifEnv* env, git_repository* repo, std::string con
   SmartPtr<git_object> to  (git_object_free,   rs.to);
 
   if ((rs.flags & GIT_REVPARSE_SINGLE) != 0)
-    return enif_make_tuple2(env, ATOM_OK, make_binary(env, oid_to_str(git_object_id(rs.from))));
+    return enif_make_tuple2(env, ATOM_OK, make_binary(env, oid_to_str(rs.from, abbrev)));
   else if ((rs.flags & GIT_REVPARSE_RANGE) == 0) [[unlikely]]
     return make_git_error(env, "Invalid results from git_revparse " + spec);
 
@@ -37,10 +57,10 @@ ERL_NIF_TERM lg2_rev_parse(ErlNifEnv* env, git_repository* repo, std::string con
   std::vector<ERL_NIF_TERM> vals;
 
   keys.push_back(ATOM_FROM);
-  vals.push_back(make_binary(env, oid_to_str(git_object_id(rs.from))));
+  vals.push_back(make_binary(env, oid_to_str(rs.from, abbrev)));
 
   keys.push_back(ATOM_TO);
-  vals.push_back(make_binary(env, oid_to_str(git_object_id(rs.to))));
+  vals.push_back(make_binary(env, oid_to_str(rs.to, abbrev)));
 
   if ((rs.flags & GIT_REVPARSE_MERGE_BASE) != 0) {
     git_oid base;
@@ -48,7 +68,7 @@ ERL_NIF_TERM lg2_rev_parse(ErlNifEnv* env, git_repository* repo, std::string con
       return make_git_error(env, "Could not find merge base " + spec);
 
     keys.push_back(ATOM_MERGE_BASE);
-    vals.push_back(make_binary(env, oid_to_str(base)));
+    vals.push_back(make_binary(env, oid_to_str(base, abbrev)));
   }
 
   ERL_NIF_TERM map;

@@ -54,14 +54,20 @@ private:
   T m_fun;
 };
 
-inline std::string oid_to_str(git_oid const& oid)
+inline std::string oid_to_str(git_oid const& oid, int abbrev = GIT_OID_SHA1_HEXSIZE)
 {
-  auto out = std::string(GIT_OID_SHA1_HEXSIZE, '\0');
+  auto out = std::string(abbrev, '\0');
   git_oid_tostr(out.data(), out.size()+1, &oid);
   return out;
 }
 
-inline std::string oid_to_str(git_oid const* oid) { return oid_to_str(*oid); }
+inline std::string oid_to_str(git_oid const* oid, int abbrev = GIT_OID_SHA1_HEXSIZE) {
+  return oid_to_str(*oid, abbrev);
+}
+
+inline std::string oid_to_str(git_object const* oid, int abbrev = GIT_OID_SHA1_HEXSIZE) {
+  return oid_to_str(git_object_id(oid), abbrev);
+}
 
 inline std::tuple<ERL_NIF_TERM, unsigned char*>
 make_binary(ErlNifEnv* env, size_t size)
@@ -94,9 +100,14 @@ inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx)
   return make_binary(env, buf);
 }
 
-inline ERL_NIF_TERM raise_git_error(ErlNifEnv* env, std::string const& pfx)
+inline ERL_NIF_TERM raise_git_exception(ErlNifEnv* env, std::string const& pfx)
 {
   return enif_raise_exception(env, fmt_git_error(env, pfx));
+}
+
+inline ERL_NIF_TERM raise_badarg_exception(ErlNifEnv* env, ERL_NIF_TERM err)
+{
+  return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, err));
 }
 
 inline ERL_NIF_TERM make_git_error(ErlNifEnv* env, std::string const& pfx)

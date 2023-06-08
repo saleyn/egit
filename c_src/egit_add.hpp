@@ -50,7 +50,7 @@ parse_opts(ErlNifEnv* env, std::vector<std::string>& file_specs, ERL_NIF_TERM fi
   while (enif_get_list_cell(env, file_specs_list, &spec, &file_specs_list)) {
     ErlNifBinary bin;
     if (!enif_inspect_binary(env, spec, &bin)) [[unlikely]]
-      return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, spec));
+      return raise_badarg_exception(env, spec);
 
     file_specs.emplace_back(std::string((const char*)bin.data, bin.size));
   }
@@ -61,7 +61,7 @@ parse_opts(ErlNifEnv* env, std::vector<std::string>& file_specs, ERL_NIF_TERM fi
     else if (enif_is_identical(opt, ATOM_UPDATE))  o.update  = true;
     else if (enif_is_identical(opt, ATOM_FORCE))   o.force   = true;
     else [[unlikely]]
-      return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, opt));
+      return raise_badarg_exception(env, opt);
   }
 
   return 0;

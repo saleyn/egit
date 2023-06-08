@@ -170,7 +170,7 @@ parse_opts(ErlNifEnv* env, ERL_NIF_TERM opt, catfile_options& o)
   else if (enif_is_identical(opt, ATOM_SIZE)) o.action  = SHOW_SIZE;
   else if (enif_is_identical(opt, ATOM_ALL))  o.action  = SHOW_ALL;
   else [[unlikely]]
-    return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, opt));
+    return raise_badarg_exception(env, opt);
 
   return 0;
 }
@@ -211,11 +211,8 @@ static ERL_NIF_TERM lg2_cat_file(ErlNifEnv* env, git_repository* repo, std::stri
         case GIT_OBJECT_COMMIT: return encode_commit(env, obj.template cast<const git_commit*>());
         case GIT_OBJECT_TREE:   return encode_tree  (env, obj.template cast<const git_tree*>());
         case GIT_OBJECT_TAG:    return encode_tag   (env, obj.template cast<const git_tag*>());
-        default: {
-          char oidstr[GIT_OID_SHA1_HEXSIZE + 1];
-          git_oid_tostr(oidstr, sizeof(oidstr), git_object_id(obj));
-          return make_git_error(env, std::format("Unknown object type {}", oidstr));
-        }
+        default:
+          return make_git_error(env, std::format("Unknown object type {}", oid_to_str(obj)));
       }
       break;
     default:

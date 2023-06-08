@@ -112,7 +112,7 @@ ERL_NIF_TERM lg2_checkout(ErlNifEnv* env, git_repository* repo, std::string cons
       else if (enif_is_identical(opt, ATOM_PERF))    o.perf    = true;
       else if (enif_is_identical(opt, ATOM_FORCE))   o.force   = true;
       else [[unlikely]]
-        return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, opt));
+        return raise_badarg_exception(env, opt);
     }
   }
 
