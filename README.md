@@ -83,7 +83,7 @@ ok
 ok
 4> file:write_file("/tmp/egit/temp.txt", <<"This is a test">>).
 ok
-5> git:add(R, ".", [verbose]).
+5> git:add(R, ".").
 #{mode => added,files => [<<"temp.txt">>]}
 6> git:commit(R, "Add test files").
 ok
