@@ -25,12 +25,11 @@ enum index_mode {
 
 struct index_options {
   index_options()
-    : dry_run(false), verbose(false), update(false), force(false)
+    : dry_run(false), update(false), force(false)
     , repo(nullptr),  mode(INDEX_ADD)
   {}
 
   bool            dry_run;
-  bool            verbose;
   bool            update;
   bool            force;
   git_repository* repo;
@@ -56,8 +55,7 @@ parse_opts(ErlNifEnv* env, std::vector<std::string>& file_specs, ERL_NIF_TERM fi
   }
 
   while (enif_get_list_cell(env, opts, &opt, &opts)) {
-    if      (enif_is_identical(opt, ATOM_VERBOSE)) o.verbose = true;
-    else if (enif_is_identical(opt, ATOM_DRY_RUN)) o.dry_run = true;
+    if      (enif_is_identical(opt, ATOM_DRY_RUN)) o.dry_run = true;
     else if (enif_is_identical(opt, ATOM_UPDATE))  o.update  = true;
     else if (enif_is_identical(opt, ATOM_FORCE))   o.force   = true;
     else [[unlikely]]
@@ -115,8 +113,7 @@ ERL_NIF_TERM lg2_add(ErlNifEnv* env, git_repository* repo, ERL_NIF_TERM file_spe
     return make_git_error(env, "Could not open repository index");
 
   // Setup a callback if the requested options need it
-  if (options.verbose || options.dry_run)
-    matched_cb = &visit_matched_cb;
+  matched_cb = &visit_matched_cb;
 
   array.count = path_specs.size();
   std::vector<const char*> strings(array.count);
@@ -140,7 +137,11 @@ ERL_NIF_TERM lg2_add(ErlNifEnv* env, git_repository* repo, ERL_NIF_TERM file_spe
     git_index_write(index);
 
   auto files = enif_make_list_from_array(env, &options.files.front(), options.files.size());
-  auto mode  = options.files.empty() ? ATOM_NONE : (options.dry_run ? ATOM_DRY_RUN : ATOM_ADDED);
+
+  if (options.files.empty())
+    return ATOM_NIL;
+
+  auto mode  = options.dry_run ? ATOM_DRY_RUN : ATOM_ADDED;
 
   ERL_NIF_TERM keys[] = {ATOM_MODE, ATOM_FILES};
   ERL_NIF_TERM vals[] = {mode,      files};

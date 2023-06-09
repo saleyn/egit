@@ -34,6 +34,7 @@
 
 -type add_opt()         :: verbose | dry_run | update | force.
 -type add_opts()        :: [add_opt()].
+-type add_result()      :: nil | #{mode => dry_run | added, files => [binary()]} | {error, term()}.
 
 -type rev_list_opt()    :: [topo_order | date_order | reverse | {limit, pos_integer()} | {abbrev, pos_integer()}].
 -type rev_list_opts()   :: [rev_list_opt()].
@@ -172,18 +173,21 @@ checkout(Repo, Revision, Opts) ->
   checkout_nif(Repo, to_bin(Revision), Opts).
 
 %% @doc Add all pending changes
+-spec add_all(repository()) -> add_result().
 add_all(Repo) when is_reference(Repo) ->
   add_nif(Repo, [<<".">>], []).
 
 %% @doc Same as `add(Repo, FileSpecs, Opts)'.
--spec add(repository(), binary()|string()|[binary()|string()]) -> [binary()] | {error, term()}.
+-spec add(repository(), binary()|string()|[binary()|string()]) -> add_result().
 add(Repo, [C|_] = PathSpec) when is_integer(C), C >= 32, C < 256 ->
   add_nif(Repo, [to_bin(PathSpec)], []);
+add(Repo, PathSpecs) when is_list(PathSpecs) ->
+  add(Repo, PathSpecs, []);
 add(Repo, PathSpec) when is_binary(PathSpec) ->
   add_nif(Repo, [PathSpec], []).
 
 %% @doc Add files matching `PathSpecs' to index.
--spec add(repository(), [binary()|string()], add_opts()) -> [binary()] | {error, term()}.
+-spec add(repository(), [binary()|string()], add_opts()) -> add_result().
 add(Repo, [C|_] = PathSpecs, Opts) when is_integer(C), C >= 32, C < 256 ->
   add_nif(Repo, [to_bin(PathSpecs)], Opts);
 add(Repo, PathSpec, Opts) when is_binary(PathSpec)->
@@ -203,7 +207,7 @@ commit(_Repo, Comment) ->
 %% Opts is a list of:
 %% <dl>
 %% <dt>{abbrev, `NumChars'}</dt>
-%%   <dd>NumChars truncates the commit hash (must be <= 40)</dd>
+%%   <dd>NumChars truncates the commit hash (must be less then 40)</dd>
 %% </dl>
 %%
 %% When a reference refers to a single object, an ok tuple with a binary
@@ -241,7 +245,7 @@ rev_parse(Repo, Spec) ->
 %% <dt>{limit, `Limit'}</dt>
 %%   <dd>Limit is an integer that limits the number of refs returned</dd>
 %% <dt>{abbrev, `NumChars'}</dt>
-%%   <dd>NumChars truncates the commit hash (must be <= 40)</dd>
+%%   <dd>NumChars truncates the commit hash (must be less then 40)</dd>
 %% </dl>
 %%
 %% Example:
@@ -296,7 +300,7 @@ config_set(Src, Key, Val) ->
   config_set_nif(Src, to_bin(Key), to_bin(Val)).
 
 %% @doc Create a branch
-%% @see `branch_create(Repo, Name, [])'.
+%% @see git:branch_create/3.
 branch_create(Repo, Name) ->
   branch_create(Repo, Name, []).
 
@@ -314,7 +318,7 @@ branch_create(Repo, Name, Opts) when is_list(Opts) ->
   branch_nif(Repo, create, to_bin(Name), Opts).
 
 %% @doc Rename a branch
-%% @see `branch_name(Repo, OldName, NewName, [])'
+%% @see branch_rename/4
 branch_rename(Repo, OldName, NewName) ->
   branch_rename(Repo, OldName, NewName, []).
 
@@ -336,7 +340,7 @@ list_branches(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
 %% @doc List branches
-%% @see `list_branches(Repo, [])'
+%% @see list_branches/2
 list_branches(Repo) ->
   list_branches(Repo, []).
 
@@ -427,20 +431,18 @@ checkout_test_() ->
 
 commit_test_() ->
   R = git:open("/tmp/egit"),
-  {ok, OID0} = git:rev_parse(R, <<"HEAD">>),
+  {ok, OID0} = git:rev_parse(R, "HEAD"),
   [
     fun() ->
       ?assert(is_reference(R)),
       ?assertEqual([], os:cmd("echo \"\n\" >> /tmp/egit/README.md")),
       ?assertEqual(
         #{mode => dry_run, files => [<<"README.md">>]},
-        git:add(R, ".", [verbose, dry_run])),
+        git:add(R, ".", [dry_run])),
       ?assertEqual(
         #{mode => added, files => [<<"README.md">>]},
-        git:add(R, ".", [verbose])),
-      ?assertEqual(
-        #{mode => none,files => []},
-        git:add(R, ["."], [verbose])),
+        git:add(R, ["."])),
+      ?assertEqual(nil, git:add(R, ".")),
       {ok, OID0} = git:rev_parse(R, "HEAD"),
       Res        = git:commit(R, "Test commit"),
       ?assertMatch({ok, _}, Res),
@@ -452,7 +454,7 @@ commit_test_() ->
 
 rev_parse_test_() ->
   R = git:open("/tmp/egit"),
-  {ok, OID0} = git:rev_parse(R, <<"HEAD">>),
+  {ok, OID0} = git:rev_parse(R, "HEAD"),
   [
     ?_assertMatch(#{to := _,   from := OID0}, git:rev_parse(R, <<"HEAD..HEAD~1">>)),
     ?_assertMatch(#{to := OID, from := OID0, merge_base := OID}, git:rev_parse(R, <<"HEAD...HEAD~1">>)),

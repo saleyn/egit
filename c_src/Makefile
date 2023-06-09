@@ -86,9 +86,7 @@ $(SO_OUTPUT): $(OBJECTS)
 %.o: %.cpp $(wildcard *.hpp)
 	@if [ $(STD_FMT) -eq 0 ]; then \
 	  echo "==> Updating fmt submodule"; \
-		git config --global --add safe.directory '*'; \
-		git submodule init; \
-		git submodule update --remote; \
-		ls -l *; \
+		[ -z "$(shell git config --global safe.directory)" ] && git config --global --add safe.directory '*' || true; \
+		git submodule update --init --recursive; \
 	fi
 	$(COMPILE_CPP) $(OUTPUT_OPTION) $<

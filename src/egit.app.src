@@ -5,5 +5,6 @@
               {modules,[git]},
               {env,[]},
               {applications,[kernel,stdlib]},
+              {exclude_paths, ["c_src/fmt", "priv/git.so", "c_src/egit.o"]},
               {licenses,["Apache 2.0"]},
               {links,[{"GitHub","https://github.com/saleyn/egit"}]}]}.
