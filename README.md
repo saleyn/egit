@@ -21,6 +21,8 @@ added.
 - Cat-file
 - Rev-parse
 - Rev-list
+- Branch list/create/rename/delete
+- Configuration get/set at various levels (e.g. system/global/local/app/default)
 
 ## Installation
 
@@ -57,13 +59,13 @@ end
 Include
 To clone a repository, give it a URL and a local path:
 ```erlang
-1> Repo = egit:clone("http://github.com/saleyn/egit.git", "/tmp").
+1> Repo = git:clone("http://github.com/saleyn/egit.git", "/tmp").
 #Ref<...>
 ```
 
 To open a local repository, give it a path:
 ```erlang
-1> Repo = egit:open(<<".">>).
+1> Repo = git:open(<<"/tmp/egit">>).
 #Ref<...>
 ```
 
@@ -75,15 +77,39 @@ After obtaining a repository reference, you can call functions in the
 `egit` module. E.g.:
 
 ```erlang
-2> egit:cat_file(Repo, <<"main">>).
-{ok,{commit,#{message => <<"Initial commit\n">>,
-              author =>
-                  {<<"Serge Aleynikov">>,<<"saleyn@gmail.com">>,1685857770,
-                   -14400},
-              committer =>
-                  {<<"Serge Aleynikov">>,<<"saleyn@gmail.com">>,1685857770,
-                   -14400},
-              parents => []}}}
+2> git:branch_create(R, "tmp", [{target, <<"1b74c46">>}]).
+ok
+3> git:checkout(R, "tmp").
+ok
+4> file:write_file("/tmp/egit/temp.txt", <<"This is a test">>).
+ok
+5> git:add(R, ".", [verbose]).
+#{mode => added,files => [<<"temp.txt">>]}
+6> git:commit(R, "Add test files").
+ok
+7> git:cat_file(R, <<"tmp">>, [{abbrev, 5}]).
+#{type => commit,
+  author =>
+      {<<"Serge Aleynikov">>,<<"test@gmail.com">>,1686195121, -14400},
+  oid => <<"b85d0">>,
+  parents => [<<"1fd4b">>]}
+8> git:cat_file(R, "b85d0", [{abbrev, 5}]).
+#{type => tree,
+  commits =>
+      [{<<".github">>,<<"tree">>,<<"1e41f">>,16384},
+       {<<".gitignore">>,<<"blob">>,<<"b893a">>,33188},
+       {<<".gitmodules">>,<<"blob">>,<<"2550a">>,33188},
+       {<<".vscode">>,<<"tree">>,<<"c7b1b">>,16384},
+       {<<"LICENSE">>,<<"blob">>,<<"d6456">>,33188},
+       {<<"Makefile">>,<<"blob">>,<<"2d635">>,33188},
+       {<<"README.md">>,<<"blob">>,<<"7b3d0">>,33188},
+       {<<"c_src">>,<<"tree">>,<<"147f3">>,16384},
+       {<<"rebar.config">>,<<"blob">>,<<"1f68a">>,33188},
+       {<<"rebar.lock">>,<<"blob">>,<<"57afc">>,33188},
+       {<<"src">>,<<"tree">>,<<"1bccb">>,16384}]}
+8> git:cat_file(R, "b893a", [{abbrev, 5}]).
+#{type => blob,
+  blob => <<"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n">>}
 ```
 
 ## Patching

@@ -17,7 +17,7 @@ namespace std { using namespace fmt; }
 #define GIT_OID_SHA1_HEXSIZE GIT_OID_HEXSZ
 #endif
 
-#ifndef GIT_REVSPEC_MERGE_BASE
+#if !defined(GIT_REVSPEC_MERGE_BASE) && defined(GIT_REVPARSE_MERGE_BASE)
 #define GIT_REVSPEC_MERGE_BASE GIT_REVPARSE_MERGE_BASE
 #endif
 
@@ -29,53 +29,8 @@ namespace std { using namespace fmt; }
 #include "egit_commit.hpp"
 #include "egit_rev_parse.hpp"
 #include "egit_rev_list.hpp"
-
-static ErlNifResourceType* GIT_REPO_RESOURCE;
-
-struct GitRepoPtr {
-  static GitRepoPtr* create(git_repository* p) {
-    auto rp = static_cast<GitRepoPtr*>(enif_alloc_resource(GIT_REPO_RESOURCE, sizeof(GitRepoPtr)));
-
-    #ifdef NIF_DEBUG
-    fprintf(stderr, "=egit=> Allocated NIF resource %p (%p) [%d]\r\n", p, rp, __LINE__);
-    #endif
-
-    if (!rp) [[unlikely]]
-      return nullptr;
-
-    new (rp) GitRepoPtr(p);
-    return rp;
-  }
-
-  ~GitRepoPtr() {
-    if (m_ptr) {
-      #ifdef NIF_DEBUG
-      fprintf(stderr, "=egit=> Releasing repository pointer %p (%p) [%d]\r\n", m_ptr, this, __LINE__);
-      #endif
-      git_repository_free(m_ptr);
-      m_ptr = nullptr;
-    }
-  }
-
-  git_repository const* get() const { return m_ptr; }
-  git_repository*       get()       { return m_ptr; }
-
-  ERL_NIF_TERM to_enif_resource(ErlNifEnv* env) {
-    ERL_NIF_TERM resource = enif_make_resource(env, (void*)this);
-
-    #ifdef NIF_DEBUG
-    fprintf(stderr, "=egit=> Moved repo ownership %p [%d]\r\n", this, __LINE__);
-    #endif
-
-    enif_release_resource((void*)this); // Grant ownership to the resource
-    return resource;
-  }
-
-private:
-  GitRepoPtr(git_repository* p) : m_ptr(p) {}
-
-  git_repository* m_ptr;
-};
+#include "egit_config.hpp"
+#include "egit_branch.hpp"
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 {
@@ -139,7 +94,7 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   if (!enif_inspect_binary(env, argv[1], &bsha)) [[unlikely]]
     return raise_badarg_exception(env, argv[1]);
 
-  std::string sha((char*)bsha.data, bsha.size);
+  std::string sha = bin_to_str(bsha);
 
   git_oid oid;
   if (git_oid_fromstr(&oid, sha.c_str()) < 0)
@@ -205,8 +160,8 @@ static ERL_NIF_TERM clone_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
       !enif_inspect_binary(env, argv[1], &path)) [[unlikely]]
     return enif_make_badarg(env);
 
-  std::string surl((char*)url.data,   url.size);
-  std::string spath((char*)path.data, path.size);
+  std::string surl  = bin_to_str(url);
+  std::string spath = bin_to_str(path);
 
   git_repository* p{};
 
@@ -228,7 +183,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
   if (!enif_inspect_binary(env, argv[0], &path)) [[unlikely]]
     return enif_make_badarg(env);
 
-  std::string spath((char*)path.data, path.size);
+  std::string spath = bin_to_str(path);
 
   git_repository* p{};
 
@@ -260,7 +215,7 @@ static ERL_NIF_TERM fetch_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
     if (!enif_inspect_binary(env, argv[2], &bin)) [[unlikely]]
       return enif_make_badarg(env);
 
-    remote_name = std::string((char*)bin.data, bin.size);
+    remote_name = bin_to_str(bin);
   }
 
   git_remote* remote;
@@ -288,7 +243,10 @@ static ERL_NIF_TERM cat_file_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
   if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
     return enif_make_badarg(env);
 
-  std::string filename((char*)bin.data, bin.size);
+  if (!enif_is_list(env, argv[2])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string filename(bin_to_str(bin));
 
   return lg2_cat_file(env, repo->get(), filename, argv[2]);
 }
@@ -308,7 +266,7 @@ static ERL_NIF_TERM checkout_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
   if (!enif_is_list(env, argv[2])) [[unlikely]]
     return enif_make_badarg(env);
 
-  std::string rev((char*)bin.data, bin.size);
+  std::string rev = bin_to_str(bin);
 
   return lg2_checkout(env, repo->get(), rev, argv[2]);
 }
@@ -339,7 +297,7 @@ static ERL_NIF_TERM commit_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
   if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
     return enif_make_badarg(env);
 
-  return lg2_commit(env, repo->get(), std::string((const char*)bin.data, bin.size));
+  return lg2_commit(env, repo->get(), bin_to_str(bin));
 }
 
 static ERL_NIF_TERM rev_parse_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
@@ -357,7 +315,7 @@ static ERL_NIF_TERM rev_parse_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
   if (!enif_is_list(env, argv[2])) [[unlikely]]
     return enif_make_badarg(env);
 
-  return lg2_rev_parse(env, repo->get(), std::string((const char*)bin.data, bin.size), argv[2]);
+  return lg2_rev_parse(env, repo->get(), bin_to_str(bin), argv[2]);
 }
 
 static ERL_NIF_TERM rev_list_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
@@ -375,6 +333,40 @@ static ERL_NIF_TERM rev_list_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
     return enif_make_badarg(env);
 
   return lg2_rev_list(env, repo->get(), argv[1], argv[2]);
+}
+
+static ERL_NIF_TERM config_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc >= 2);
+
+  if (argc > 3) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_config(env, argv[0], argv[1], argc == 3 ? argv[2] : 0);
+}
+
+static ERL_NIF_TERM branch_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc >= 3 && argc <= 4);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ERL_NIF_TERM op = argv[1];
+
+  return lg2_branch(env, repo->get(), op, argv[2], argc == 4 ? argv[3] : 0);
+}
+
+static ERL_NIF_TERM list_branches_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_branch_list(env, repo->get(), argv[1]);
 }
 
 static void resource_dtor(ErlNifEnv* env, void* arg)
@@ -425,7 +417,12 @@ static ErlNifFunc egit_funcs[] =
   {"cat_file_nif",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"rev_parse_nif",     3, rev_parse_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"rev_list_nif",      3, rev_list_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"config_get_nif",    2, config_nif},
+  {"config_set_nif",    3, config_nif},
+  {"branch_nif",        3, branch_nif},
+  {"branch_nif",        4, branch_nif},
+  {"list_branches",     2, list_branches_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"commit_lookup_nif", 3, commit_lookup_nif, 0},
 };
 
-ERL_NIF_INIT(egit, egit_funcs, load, NULL, upgrade, NULL);
+ERL_NIF_INIT(git, egit_funcs, load, NULL, upgrade, NULL);

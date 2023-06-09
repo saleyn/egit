@@ -52,7 +52,7 @@ parse_opts(ErlNifEnv* env, std::vector<std::string>& file_specs, ERL_NIF_TERM fi
     if (!enif_inspect_binary(env, spec, &bin)) [[unlikely]]
       return raise_badarg_exception(env, spec);
 
-    file_specs.emplace_back(std::string((const char*)bin.data, bin.size));
+    file_specs.emplace_back(bin_to_str(bin));
   }
 
   while (enif_get_list_cell(env, opts, &opt, &opts)) {

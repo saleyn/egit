@@ -1,6 +1,6 @@
 CURDIR		:= $(shell pwd)
 BASEDIR		:= $(abspath $(dir $(CURDIR)))
-PROJECT		?= egit
+PROJECT		?= git
 PROJECT		:= $(strip $(PROJECT))
 
 ERL_CXXFLAGS ?= $(shell erl -noshell -noinput -eval "io:format(\"-I~ts/erts-~ts/include -I~ts\", [code:root_dir(), erlang:system_info(version), code:lib_dir(erl_interface, include)]), halt(0).")

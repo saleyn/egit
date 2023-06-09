@@ -46,7 +46,7 @@ static int push_range(git_repository* repo, git_revwalk* walk, const std::string
   SmartPtr<git_object> from(git_object_free, revspec.from);
   SmartPtr<git_object> to  (git_object_free, revspec.to);
 
-  if (revspec.flags & GIT_REVSPEC_MERGE_BASE) {
+  if (revspec.flags & GIT_REVPARSE_MERGE_BASE) {
     /* TODO: support "<commit>...<commit>" */
     return GIT_EINVALIDSPEC;
   }

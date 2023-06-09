@@ -1,0 +1,537 @@
+-module(git).
+-export([clone/2, open/1, fetch/1, fetch/2, pull/1, pull/2, commit_lookup/3]).
+-export([cat_file/2, cat_file/3, checkout/2, checkout/3]).
+-export([add_all/1, add/2, add/3, commit/2, rev_parse/2, rev_parse/3, rev_list/3]).
+-export([config_get/2, config_set/3]).
+-export([branch_create/2, branch_create/3]).
+-export([branch_rename/3, branch_rename/4, branch_delete/2]).
+-export([list_branches/1, list_branches/2]).
+
+-on_load(init/0).
+
+-type repository() :: reference().
+-type commit_opt() ::
+  encoding    |
+  message     |
+  summary     |
+  time        |
+  time_offset |
+  committer   |
+  author      |
+  header      |
+  tree_id.
+-type commit_opts()     :: [commit_opt()].
+-type cat_file_opt()    :: type | size | {abbrev, pos_integer()}.
+-type cat_file_opts()   :: [cat_file_opt()].
+-type checkout_opt()    :: force | verbose | perf.
+-type checkout_opts()   :: [checkout_opt()].
+-type checkout_stats()  :: #{
+  chmod_calls => integer(),
+  mkdir_calls => integer(),
+  stat_calls  => integer(),
+  total_steps => integer()
+}.
+
+-type add_opt()         :: verbose | dry_run | update | force.
+-type add_opts()        :: [add_opt()].
+
+-type rev_list_opt()    :: [topo_order | date_order | reverse | {limit, pos_integer()} | {abbrev, pos_integer()}].
+-type rev_list_opts()   :: [rev_list_opt()].
+
+-type rev_parse_opt()   :: {abbrev, pos_integer()}.
+-type rev_parse_opts()  :: [rev_parse_opt()].
+
+-type list_branch_opt() :: local | remote | all | fullname | {limit,pos_integer()}.
+%% List branch option.
+%% <dl>
+%% <dt>local</dt><dd>Return only local branches</dd>
+%% <dt>remote</dt><dd>Return only remote branches</dd>
+%% <dt>all</dt><dd>Return all branches (default)</dd>
+%% <dt>fullname</dt><dd>Return full branch names</dd>
+%% <dt>{limit, Limit}</dt><dd>Return up to this number of branches</dd>
+%% </dl>
+
+-type list_branch_opts():: [list_branch_opt()].
+
+-type cfg_source()      :: repository() | default | system | xdg | global | local | app | highest.
+%% Configuration source.
+%% If the value is an atom, then:
+%% <dl>
+%% <dt>default</dt><dd>Find default configuration file for this app</dd>
+%% <dt>system</dt><dd>System-wide configuration file - /etc/gitconfig on Linux systems</dd>
+%% <dt>xdg</dt><dd>XDG compatible configuration file, typically ~/.config/git/config</dd>
+%% <dt>global</dt><dd>User-specific global configuration file, typically ~/.gitconfig</dd>
+%% <dt>local</dt><dd>Repository specific configuration file; $WORK_DIR/.git/config on non-bare repos</dd>
+%% <dt>app</dt><dd>Application specific configuration file; freely defined by applications</dd>
+%% <dt>highest</dt><dd>The most specific config file available for the app</dd>
+%% </dl>
+
+-type branch_create_opts() :: [overwrite | {target, binary()}].
+%% Branch creation options
+%% <dl>
+%% <dt>overwrite</dt><dd>Force to overwrite the existing branch</dd>
+%% <dt>{target, Commit}</dt><dd>Use the target commit (default `<<"HEAD">>')</dd>
+%% </dl>
+
+-export_type([repository/0, commit_opts/0, cat_file_opt/0, checkout_opts/0, checkout_stats/0]).
+-export_type([rev_parse_opts/0, rev_list_opts/0]).
+
+-define(LIBNAME, ?MODULE).
+-define(NOT_LOADED_ERROR,
+  erlang:nif_error({not_loaded, [{module, ?MODULE}, {line, ?LINE}]})).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
+init() ->
+  SoName  =
+    case code:priv_dir(?LIBNAME) of
+      {error, bad_name} ->
+        case code:which(?MODULE) of
+          Filename when is_list(Filename) ->
+            Dir = filename:dirname(filename:dirname(Filename)),
+            filename:join([Dir, "priv", ?LIBNAME]);
+          _ ->
+            filename:join("../priv", ?LIBNAME)
+        end;
+      Dir ->
+        filename:join(Dir, ?LIBNAME)
+  end,
+  erlang:load_nif(SoName, []).
+
+%% @doc Clone a remote repository to the local path
+-spec clone(binary()|string(), binary()|string()) -> repository().
+clone(URL, Path)    -> clone_nif(to_bin(URL), to_bin(Path)).
+
+%% @doc Open a local git repository
+-spec open(binary()|string()) -> repository().
+open(Path)          -> open_nif(to_bin(Path)).
+
+%% @doc Fetch from origin
+-spec fetch(repository()) -> ok | {error, binary()}.
+fetch(Repo)         -> fetch_nif(Repo, fetch).
+
+%% @doc Fetch from given remote (e.g. `<<"origin">>')
+-spec fetch(repository(), binary()|string()) -> ok | {error, binary()}.
+fetch(Repo, Remote) -> fetch_nif(Repo, fetch, to_bin(Remote)).
+
+%% @doc Pull from origin
+-spec pull(repository()) -> ok | {error, binary()}.
+pull(Repo)          -> fetch_nif(Repo, pull).
+
+%% @doc Pull from given remote (e.g. `<<"origin">>')
+-spec pull(repository(), binary()|string()) -> ok | {error, binary()}.
+pull(Repo, Remote)  -> fetch_nif(Repo, pull, to_bin(Remote)).
+
+%% @doc Provide content or type and size information for repository objects.
+-spec cat_file(repository(), binary()|string()) -> {ok, term()} | {error, term()}.
+cat_file(Repo, Rev) ->
+  cat_file(Repo, Rev, []).
+
+%% @doc Provide content or type and size information for repository objects.
+%% Example:
+%% ```
+%% 1> R = git:open(".").
+%% 2> git:cat_file(R, "main", [{abbrev, 5}]).
+%% #{type => commit,
+%%   author => {<<"Serge Aleynikov">>,<<"test@gmail.com">>,1686195121, -14400},
+%%   oid => <<"b85d0">>,
+%%   parents => [<<"1fd4b">>]}
+%% 7> git:cat_file(R, "b85d0", [{abbrev, 5}]).
+%% #{type => tree,
+%%   commits =>
+%%       [{<<".github">>,<<"tree">>,<<"1e41f">>,16384},
+%%        {<<".gitignore">>,<<"blob">>,<<"b893a">>,33188},
+%%        {<<".gitmodules">>,<<"blob">>,<<"2550a">>,33188},
+%%        {<<".vscode">>,<<"tree">>,<<"c7b1b">>,16384},
+%%        {<<"LICENSE">>,<<"blob">>,<<"d6456">>,33188},
+%%        {<<"Makefile">>,<<"blob">>,<<"2d635">>,33188},
+%%        {<<"README.md">>,<<"blob">>,<<"7b3d0">>,33188},
+%%        {<<"c_src">>,<<"tree">>,<<"147f3">>,16384},
+%%        {<<"rebar.config">>,<<"blob">>,<<"1f68a">>,33188},
+%%        {<<"rebar.lock">>,<<"blob">>,<<"57afc">>,33188},
+%%        {<<"src">>,<<"tree">>,<<"1bccb">>,16384}]}
+%% 8> git:cat_file(R, "b893a", [{abbrev, 5}]).
+%% #{type => blob,
+%%   blob => <<"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n">>}
+%% '''
+-spec cat_file(repository(), binary()|string(), cat_file_opts()) -> {ok, term()} | {error, term()}.
+cat_file(Repo, Rev, Opts) ->
+  cat_file_nif(Repo, to_bin(Rev), Opts).
+
+%% @doc Same as `checkout(Repo, Revision, [])'.
+-spec checkout(repository(), binary()|string()) -> ok | {error, term()}.
+checkout(Repo, Rev) -> checkout_nif(Repo, to_bin(Rev), []).
+
+%% @doc Provide content or type and size information for repository objects.
+%% If `Opts' contains `verbose' (and optionally `perf'), then the return is a
+%% map with checkout stats.
+-spec checkout(repository(), binary(), checkout_opts()) -> ok | checkout_stats() | {error, term()}.
+checkout(Repo, Revision, Opts) ->
+  checkout_nif(Repo, to_bin(Revision), Opts).
+
+%% @doc Add all pending changes
+add_all(Repo) when is_reference(Repo) ->
+  add_nif(Repo, [<<".">>], []).
+
+%% @doc Same as `add(Repo, FileSpecs, Opts)'.
+-spec add(repository(), binary()|string()|[binary()|string()]) -> [binary()] | {error, term()}.
+add(Repo, [C|_] = PathSpec) when is_integer(C), C >= 32, C < 256 ->
+  add_nif(Repo, [to_bin(PathSpec)], []);
+add(Repo, PathSpec) when is_binary(PathSpec) ->
+  add_nif(Repo, [PathSpec], []).
+
+%% @doc Add files matching `PathSpecs' to index.
+-spec add(repository(), [binary()|string()], add_opts()) -> [binary()] | {error, term()}.
+add(Repo, [C|_] = PathSpecs, Opts) when is_integer(C), C >= 32, C < 256 ->
+  add_nif(Repo, [to_bin(PathSpecs)], Opts);
+add(Repo, PathSpec, Opts) when is_binary(PathSpec)->
+  add_nif(Repo, [PathSpec], Opts);
+add(Repo, PathSpecs, Opts) when is_list(PathSpecs)->
+  add_nif(Repo, [to_bin(B) || B <- PathSpecs], Opts).
+
+%% @doc Commit changes to a repository
+-spec commit(repository(), binary()|string()) -> {ok, OID::binary()} | {error, binary()|atom()}.
+commit(_Repo, Comment) ->
+  commit_nif(_Repo, to_bin(Comment)).
+
+%% @doc Reverse parse a reference.
+%% See [https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions]
+%% for the formats of a `Spec'.
+%%
+%% Opts is a list of:
+%% <dl>
+%% <dt>{abbrev, `NumChars'}</dt>
+%%   <dd>NumChars truncates the commit hash (must be <= 40)</dd>
+%% </dl>
+%%
+%% When a reference refers to a single object, an ok tuple with a binary
+%% string of the commit hash is returned.  When it refers to a range
+%% (e.g. `HEAD..HEAD~2`), a map is returned with `from' and `to' keys.
+%% When using a Symmetric Difference Notation `...' (i.e. `HEAD...HEAD~4'),
+%% a map with three keys `from', `to', and `merge_base' is returned.
+%%
+%% Examples:
+%% ```
+%% 2> git:rev_parse(R,<<"HEAD~4">>, [{abbrev, 7}]).
+%% {ok,<<"6d6f662">>}
+%% 3> git:rev_parse(R,<<"HEAD..HEAD~4">>, [{abbrev, 7}]).
+%% git:rev_parse(R,<<"HEAD..HEAD~4">>, [{abbrev, 7}]).
+%% #{from => <<"f791f01">>,to => <<"6d6f662">>}
+%% 4> git:rev_parse(R,<<"HEAD...HEAD~4">>).
+%% git:rev_parse(R,<<"HEAD...HEAD~4">>, [{abbrev, 7}]).
+%% #{from => <<"f791f01">>,merge_base => <<"6d6f662">>, to => <<"6d6f662">>}
+%% '''
+-spec rev_parse(repository(), binary()|string(), rev_parse_opts()) -> {ok, binary()} | map() | {error, binary()|atom()}.
+rev_parse(Repo, Spec, Opts) ->
+  rev_parse_nif(Repo, to_bin(Spec), Opts).
+
+%% @doc Same as `rev_parse(Repo, Spec, [])'.
+-spec rev_parse(repository(), binary()|string()) -> {ok, binary()} | map() | {error, binary()|atom()}.
+rev_parse(Repo, Spec) ->
+  rev_parse(Repo, Spec, []).
+
+%% @doc Return the list of OIDs for the given specs.
+%%
+%% Opts is a list of:
+%% <dl>
+%% <dt>topo_order | date_order | reverse</dt>
+%%   <dd>Control sorting order</dd>
+%% <dt>{limit, `Limit'}</dt>
+%%   <dd>Limit is an integer that limits the number of refs returned</dd>
+%% <dt>{abbrev, `NumChars'}</dt>
+%%   <dd>NumChars truncates the commit hash (must be <= 40)</dd>
+%% </dl>
+%%
+%% Example:
+%% ```
+%% 9> git:rev_list(R, ["HEAD"], [{limit, 4}, {abbrev, 7}]).
+%% [<<"f791f01">>,<<"1b74c46">>,<<"c40374d">>,<<"12968bd">>]
+%% '''
+-spec rev_list(repository(), ['not'|'Elixir.Not'|binary()], rev_list_opts()) -> #{commit_opt() => term()}.
+rev_list(Repo, Specs, Opts) when is_list(Specs) ->
+  F = fun
+    ('not')               -> 'not';
+    ('Elixir.Not')        -> 'not';
+    (I) when is_list(I)   -> list_to_binary(I);
+    (I) when is_binary(I) -> I
+  end,
+  L = [F(I) || I <-
+        case Specs of
+          _ when is_binary(Specs) -> [Specs];
+          [C|_] when is_integer(C), C >= 40, C < 256 -> [list_to_binary(Specs)];
+          _ when is_list(Specs)   -> Specs
+        end],
+  rev_list_nif(Repo, L, Opts).
+
+%% @doc Lookup commit details identified by OID
+-spec commit_lookup(repository(), binary()|string(), [commit_opt()]) -> #{commit_opt() => term()}.
+commit_lookup(Repo, OID, Opts) ->
+  commit_lookup_nif(Repo, to_bin(OID), Opts).
+
+%% @doc Get git configuration value
+%% Example:
+%% ```
+%% 1> R = git:clone(<<"https://github.com/saleyn/egit.git">>, "/tmp/egit").
+%% #Ref<0.170091758.2335834136.12133>
+%% 2> git:config_get(R, "user.name").
+%% {ok,<<"Serge Aleynikov">>}
+%% '''
+-spec config_get(cfg_source(), binary()|string()) -> {ok, binary()} | {error, binary()|atom()}.
+config_get(Src, Key) ->
+  config_get_nif(Src, to_bin(Key)).
+
+%% @doc Set git configuration value
+%% Example:
+%% ```
+%% 1> R = git:clone(<<"https://github.com/saleyn/egit.git">>, "/tmp/egit").
+%% #Ref<0.170091758.2335834136.12133>
+%% 2> git:config_set(R, "user.name", "Test User").
+%% ok
+%% '''
+-spec config_set(cfg_source(), binary()|string(), binary()|string()) ->
+        ok | {error, binary()|atom()}.
+config_set(Src, Key, Val) ->
+  config_set_nif(Src, to_bin(Key), to_bin(Val)).
+
+%% @doc Create a branch
+%% @see `branch_create(Repo, Name, [])'.
+branch_create(Repo, Name) ->
+  branch_create(Repo, Name, []).
+
+%% @doc Create a branch
+%% Example:
+%% ```
+%% 1> R = git:clone(<<"https://github.com/saleyn/egit.git">>, "/tmp/egit").
+%% #Ref<0.170091758.2335834136.12133>
+%% 2> git:branch_create(R, "tmp").
+%% ok
+%% '''
+-spec branch_create(repository(), binary()|string(), branch_create_opts()) ->
+        ok | {error, binary()}.
+branch_create(Repo, Name, Opts) when is_list(Opts) ->
+  branch_nif(Repo, create, to_bin(Name), Opts).
+
+%% @doc Rename a branch
+%% @see `branch_name(Repo, OldName, NewName, [])'
+branch_rename(Repo, OldName, NewName) ->
+  branch_rename(Repo, OldName, NewName, []).
+
+%% @doc Rename a branch
+-spec branch_rename(repository(), binary()|string(), binary()|string(), [overwrite]) ->
+        ok | {error, binary()}.
+branch_rename(Repo, OldName, NewName, Opts) when is_list(Opts) ->
+  branch_nif(Repo, rename, to_bin(OldName), [{new_name, to_bin(NewName)} | Opts]).
+
+%% @doc Delete a branch
+-spec branch_delete(repository(), binary()|string()) ->
+        ok | {error, binary()}.
+branch_delete(Repo, Name) ->
+  branch_nif(Repo, delete, to_bin(Name)).
+
+%% @doc List branches
+-spec list_branches(repository(), list_branch_opts()) -> [{local|remote, binary()}].
+list_branches(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+%% @doc List branches
+%% @see `list_branches(Repo, [])'
+list_branches(Repo) ->
+  list_branches(Repo, []).
+
+%%-----------------------------------------------------------------------------
+%% Internal functions
+%%-----------------------------------------------------------------------------
+
+to_bin(B) when is_binary(B) -> B;
+to_bin(B) when is_list(B)   -> list_to_binary(B).
+
+clone_nif(URL, Path) when is_binary(URL), is_binary(Path) ->
+  ?NOT_LOADED_ERROR.
+
+open_nif(Path) when is_binary(Path) ->
+  ?NOT_LOADED_ERROR.
+
+fetch_nif(Repo, _Op) when is_reference(Repo) ->
+  ?NOT_LOADED_ERROR.
+
+fetch_nif(Repo, _Op, Remote) when is_reference(Repo), is_binary(Remote) ->
+  ?NOT_LOADED_ERROR.
+
+add_nif(Repo, PathSpecs, Opts) when is_reference(Repo), is_list(PathSpecs), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+cat_file_nif(Repo, Rev, Opts) when is_reference(Repo), is_binary(Rev), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+checkout_nif(Repo, Revision, Opts) when is_reference(Repo), is_binary(Revision), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+commit_nif(Repo, Comment) when is_reference(Repo), is_binary(Comment) ->
+  ?NOT_LOADED_ERROR.
+
+commit_lookup_nif(Repo, OID, Opts) when is_reference(Repo), is_binary(OID), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+rev_parse_nif(Repo, Spec, Opts) when is_reference(Repo), is_binary(Spec), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+rev_list_nif(Repo, Specs, Opts) when is_reference(Repo), is_list(Specs), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+config_get_nif(Src, Key) when is_reference(Src) orelse is_atom(Src), is_binary(Key) ->
+  ?NOT_LOADED_ERROR.
+
+config_set_nif(Src, Key, Val) when is_reference(Src) orelse is_atom(Src), is_binary(Key), is_binary(Val) ->
+  ?NOT_LOADED_ERROR.
+
+branch_nif(Repo, Op, Name) when is_reference(Repo), is_atom(Op), is_binary(Name) ->
+  ?NOT_LOADED_ERROR.
+
+branch_nif(Repo, Op, OldName, NewNameOrOpt)
+  when is_reference(Repo), is_atom(Op)
+     , is_binary(OldName), is_binary(NewNameOrOpt) orelse is_list(NewNameOrOpt) ->
+  ?NOT_LOADED_ERROR.
+
+-ifdef(EUNIT).
+
+clone_test_() ->
+  file:del_dir_r("/tmp/egit"),
+  R = git:clone(<<"https://github.com/saleyn/egit.git">>, <<"/tmp/egit">>),
+  [
+    ?_assert(is_reference(R)),
+    ?_assertMatch({ok, _}, git:rev_parse(R, <<"HEAD">>))
+  ].
+
+fetch_test_() ->
+  R = git:open(<<"/tmp/egit">>),
+  [
+    ?_assert(is_reference(R)),
+    ?_assertEqual(ok, git:fetch(R))
+  ].
+
+pull_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assert(is_reference(R)),
+    ?_assertEqual(ok, git:fetch(R))
+  ].
+
+checkout_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assert(is_reference(R)),
+    ?_assertEqual(ok, git:checkout(R, <<"main">>))
+  ].
+
+commit_test_() ->
+  R = git:open("/tmp/egit"),
+  {ok, OID0} = git:rev_parse(R, <<"HEAD">>),
+  [
+    fun() ->
+      ?assert(is_reference(R)),
+      ?assertEqual([], os:cmd("echo \"\n\" >> /tmp/egit/README.md")),
+      ?assertEqual(
+        #{mode => dry_run, files => [<<"README.md">>]},
+        git:add(R, ".", [verbose, dry_run])),
+      ?assertEqual(
+        #{mode => added, files => [<<"README.md">>]},
+        git:add(R, ".", [verbose])),
+      ?assertEqual(
+        #{mode => none,files => []},
+        git:add(R, ["."], [verbose])),
+      {ok, OID0} = git:rev_parse(R, "HEAD"),
+      Res        = git:commit(R, "Test commit"),
+      ?assertMatch({ok, _}, Res),
+      {ok, OID}  = Res,
+      ?assertEqual({ok, nil}, git:commit(R, "Test commit")),
+      ?assertEqual({ok, OID}, git:rev_parse(R, "HEAD"))
+    end
+  ].
+
+rev_parse_test_() ->
+  R = git:open("/tmp/egit"),
+  {ok, OID0} = git:rev_parse(R, <<"HEAD">>),
+  [
+    ?_assertMatch(#{to := _,   from := OID0}, git:rev_parse(R, <<"HEAD..HEAD~1">>)),
+    ?_assertMatch(#{to := OID, from := OID0, merge_base := OID}, git:rev_parse(R, <<"HEAD...HEAD~1">>)),
+    ?_assertMatch({error, _}, git:rev_parse(R, <<"HEAD~x">>)),
+    fun() ->
+      case git:rev_list(R, ["HEAD"], [{limit, 3}, {abbrev, 7}]) of
+        [A,B,C] when is_binary(A), is_binary(B), is_binary(C),
+                      byte_size(A)==7, byte_size(B)==7, byte_size(C)==7 ->
+          ok;
+        _Res ->
+          ?assert(false)
+      end
+    end
+  ].
+
+cat_file_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assertMatch(
+      (#{type    := commit,
+         author  := {User, _, Time, Offset},
+         oid     := OID,
+         parents := [OID1]})
+        when is_binary(User) andalso is_integer(Time) andalso is_integer(Offset)
+             andalso is_binary(OID) andalso is_binary(OID1),
+      git:cat_file(R, <<"main">>, [{abbrev, 5}])
+    ),
+
+    ?_assertMatch(
+      #{type    := tree,
+        commits :=
+          [{<<".github">>,<<"tree">>,_,16384},
+          {<<".gitignore">>,<<"blob">>,_,33188},
+          {<<".gitmodules">>,<<"blob">>,_,33188},
+          {<<".vscode">>,<<"tree">>,_,16384},
+          {<<"LICENSE">>,<<"blob">>,_,33188},
+          {<<"Makefile">>,<<"blob">>,_,33188},
+          {<<"README.md">>,<<"blob">>,_,33188},
+          {<<"c_src">>,<<"tree">>,_,16384},
+          {<<"rebar.config">>,<<"blob">>,_,33188},
+          {<<"rebar.lock">>,<<"blob">>,_,33188},
+          {<<"src">>,<<"tree">>,_,16384}]},
+      git:cat_file(R, "b85d0", [{abbrev, 5}])
+    ),
+
+    ?_assertEqual(
+      #{type => blob,
+        data => <<"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n">>},
+      git:cat_file(R, "b893a", [{abbrev, 5}])
+    )
+  ].
+
+config_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assertMatch({ok, _}, git:config_get(R,       "user.email")),
+    ?_assertMatch({ok, _}, git:config_get(highest, "user.email")),
+    ?_assertMatch({ok, _}, git:config_get(default, "user.email")),
+    ?_assertMatch({ok, _}, git:config_get(global,  "user.email"))
+  ].
+
+branch_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assertMatch(ok, git:branch_create(R, "tmp", [])),
+    ?_assert(has_branch(R, "tmp")),
+    ?_assertMatch(ok, git:branch_rename(R, "tmp", "tmp2", [overwrite])),
+    ?_assert(has_branch(R, "tmp2")),
+    ?_assertNot(has_branch(R, "tmp")),
+    ?_assertMatch(ok, git:branch_delete(R, "tmp2")),
+    ?_assertNot(has_branch(R, "tmp2"))
+  ].
+
+last_test() ->
+  %% Delete the directory if test cases succeeded
+  file:del_dir_r("/tmp/egit").
+
+has_branch(R, Name) ->
+  Nm = to_bin(Name),
+  [B || {local, B} <- git:list_branches(R), B == Nm] /= [].
+
+-endif.

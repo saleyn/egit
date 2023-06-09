@@ -2,7 +2,7 @@
              [{description,"Native git Erlang inteface library"},
               {vsn,"0.1.2"},
               {registered,[]},
-              {modules,[]},
+              {modules,[git]},
               {env,[]},
               {applications,[kernel,stdlib]},
               {licenses,["Apache 2.0"]},

@@ -72,6 +72,20 @@
     "streambuf": "cpp",
     "cinttypes": "cpp",
     "typeinfo": "cpp",
-    "variant": "cpp"
+    "variant": "cpp",
+    "chrono": "cpp",
+    "typeindex": "cpp",
+    "any": "cpp",
+    "codecvt": "cpp",
+    "complex": "cpp",
+    "condition_variable": "cpp",
+    "map": "cpp",
+    "set": "cpp",
+    "iomanip": "cpp",
+    "iostream": "cpp",
+    "mutex": "cpp",
+    "semaphore": "cpp",
+    "stop_token": "cpp",
+    "thread": "cpp"
   }
  }
