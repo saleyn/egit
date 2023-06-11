@@ -175,6 +175,47 @@ static ERL_NIF_TERM clone_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
   return to_monitored_resource(env, p);
 }
 
+static ERL_NIF_TERM init_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  std::string path;
+  auto        bare = false;
+
+  // Parse options
+  {
+    auto opts = argv[1];
+
+    ErlNifBinary bin;
+    if (!enif_inspect_binary(env, argv[0], &bin) || bin.size == 0) [[unlikely]]
+      return enif_make_badarg(env);
+
+    if (!enif_is_list(env, opts)) [[unlikely]]
+      return enif_make_badarg(env);
+
+    ERL_NIF_TERM opt;
+
+    while (enif_get_list_cell(env, opts, &opt, &opts)) {
+      if (enif_is_identical(opt, ATOM_BARE)) bare = true;
+      else [[unlikely]]
+        return raise_badarg_exception(env, opt);
+    }
+
+    path = bin_to_str(bin);
+  }
+
+  git_repository* p{};
+
+  if (git_repository_init(&p, path.c_str(), bare) != GIT_OK) [[unlikely]]
+    return raise_git_exception(env, std::format("Failed to init git repo {}", path));
+
+  #ifdef NIF_DEBUG
+  fprintf(stderr, "=egit=> Init repo %p [%d]\r\n", p, __LINE__);
+  #endif
+
+  return to_monitored_resource(env, p);
+}
+
 static ERL_NIF_TERM open_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
   ErlNifBinary path;
@@ -407,6 +448,7 @@ static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_N
 
 static ErlNifFunc egit_funcs[] =
 {
+  {"init_nif",          2, init_nif},
   {"clone_nif",         2, clone_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"open_nif",          1, open_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"fetch_nif",         2, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},

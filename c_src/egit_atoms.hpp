@@ -6,6 +6,7 @@ static ERL_NIF_TERM ATOM_ALL;
 static ERL_NIF_TERM ATOM_APP;
 static ERL_NIF_TERM ATOM_AUTHOR;
 static ERL_NIF_TERM ATOM_BADARG;
+static ERL_NIF_TERM ATOM_BARE;
 static ERL_NIF_TERM ATOM_BLOB;
 static ERL_NIF_TERM ATOM_CHMOD_CALLS;
 static ERL_NIF_TERM ATOM_COMMIT;
@@ -80,6 +81,7 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_ALL         = enif_make_atom(env, "all");
   ATOM_APP         = enif_make_atom(env, "app");
   ATOM_AUTHOR      = enif_make_atom(env, "author");
+  ATOM_BARE        = enif_make_atom(env, "bare");
   ATOM_BADARG      = enif_make_atom(env, "badarg");
   ATOM_BLOB        = enif_make_atom(env, "blob");
   ATOM_CHMOD_CALLS = enif_make_atom(env, "chmod_calls");

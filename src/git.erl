@@ -1,5 +1,5 @@
 -module(git).
--export([clone/2, open/1, fetch/1, fetch/2, pull/1, pull/2, commit_lookup/3]).
+-export([init/1, init/2, clone/2, open/1, fetch/1, fetch/2, pull/1, pull/2, commit_lookup/3]).
 -export([cat_file/2, cat_file/3, checkout/2, checkout/3]).
 -export([add_all/1, add/2, add/3, commit/2, rev_parse/2, rev_parse/3, rev_list/3]).
 -export([config_get/2, config_set/3]).
@@ -7,7 +7,7 @@
 -export([branch_rename/3, branch_rename/4, branch_delete/2]).
 -export([list_branches/1, list_branches/2]).
 
--on_load(init/0).
+-on_load(on_load/0).
 
 -type repository() :: reference().
 -type commit_opt() ::
@@ -85,7 +85,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
-init() ->
+on_load() ->
   SoName  =
     case code:priv_dir(?LIBNAME) of
       {error, bad_name} ->
@@ -100,6 +100,20 @@ init() ->
         filename:join(Dir, ?LIBNAME)
   end,
   erlang:load_nif(SoName, []).
+
+%% @doc Init a repository.
+%% @see init/2.
+-spec init(binary()|string()) -> repository().
+init(Path) -> init(Path, []).
+
+%% @doc Init a repository.
+%% If `Opts' list contains `bare', a Git repository without a working
+%% directory is created at the pointed path.
+%% Otherwise, the provided path will be considered as the working
+%% directory into which the .git directory will be created.
+-spec init(binary()|string(), [bare]) -> repository().
+init(Path, Opts) ->
+  init_nif(to_bin(Path), Opts).
 
 %% @doc Clone a remote repository to the local path
 -spec clone(binary()|string(), binary()|string()) -> repository().
@@ -351,6 +365,9 @@ list_branches(Repo) ->
 to_bin(B) when is_binary(B) -> B;
 to_bin(B) when is_list(B)   -> list_to_binary(B).
 
+init_nif(Path, Opts) when is_binary(Path), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
 clone_nif(URL, Path) when is_binary(URL), is_binary(Path) ->
   ?NOT_LOADED_ERROR.
 
@@ -399,6 +416,18 @@ branch_nif(Repo, Op, OldName, NewNameOrOpt)
   ?NOT_LOADED_ERROR.
 
 -ifdef(EUNIT).
+
+init_test_() ->
+  file:del_dir_r("/tmp/egit_repo"),
+  [
+    ?_assertMatch(B when is_reference(B), git:init("/tmp/egit_repo")),
+    ?_assert(filelib:is_dir("/tmp/egit_repo/.git")),
+    ?_assertEqual(ok, file:del_dir_r("/tmp/egit_repo")),
+    ?_assertMatch(B when is_reference(B), git:init("/tmp/egit_repo", [bare])),
+    ?_assertNot(filelib:is_dir("/tmp/egit_repo/.git")),
+    ?_assert(filelib:is_regular("/tmp/egit_repo/HEAD")),
+    ?_assertEqual(ok, file:del_dir_r("/tmp/egit_repo"))
+  ].
 
 clone_test_() ->
   file:del_dir_r("/tmp/egit"),
