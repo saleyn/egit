@@ -1,11 +1,15 @@
 -module(git).
--export([init/1, init/2, clone/2, open/1, fetch/1, fetch/2, pull/1, pull/2, commit_lookup/3]).
+-export([init/1, init/2, clone/2, open/1, fetch/1, fetch/2,
+         pull/1, pull/2, commit_lookup/3]).
 -export([cat_file/2, cat_file/3, checkout/2, checkout/3]).
--export([add_all/1, add/2, add/3, commit/2, rev_parse/2, rev_parse/3, rev_list/3]).
+-export([add_all/1, add/2, add/3, commit/2,
+         rev_parse/2, rev_parse/3, rev_list/3]).
 -export([config_get/2, config_set/3]).
 -export([branch_create/2, branch_create/3]).
--export([branch_rename/3, branch_rename/4, branch_delete/2]).
--export([list_branches/1, list_branches/2]).
+-export([branch_rename/3, branch_rename/4,  branch_delete/2]).
+-export([list_branches/1, list_branches/2,  list_index/1, list_index/2]).
+-export([list_remotes/1,  remote_add/3,     remote_rename/3,
+         remote_delete/2, remote_set_url/3, remote_set_url/4]).
 
 -on_load(on_load/0).
 
@@ -52,9 +56,29 @@
 %% <dt>{limit, Limit}</dt><dd>Return up to this number of branches</dd>
 %% </dl>
 
--type list_branch_opts():: [list_branch_opt()].
+-type list_branch_opts() :: [list_branch_opt()].
 
--type cfg_source()      :: repository() | default | system | xdg | global | local | app | highest.
+-type list_index_opt()   :: {abbrev, pos_integer()} |
+  {fields, all | [path|stage|conflict|oid|mode|size|ctime|mtime]}.
+%% List index option.
+%% <dl>
+%% <dt>{abbrev, `NumChars'}</dt>
+%%   <dd>NumChars truncates the commit hash (must be less then 40).</dd>
+%% <dt>{fields, ListOfFields}</dt>
+%%   <dd>Field list to return. If not specified, the option will default
+%%       to `[path]'.</dd>
+%% </dl>
+
+-type list_index_opts()  :: [list_index_opt()].
+
+-type list_index_entry() :: #{
+  path     => binary(),      stage => [normal|ancestor|ours|theirs],
+  conflict => boolean(),       oid => binary(),
+  mode     => pos_integer(),  size => non_neg_integer(),
+  ctime    => pos_integer(), mtime => pos_integer()
+}.
+
+-type cfg_source()       :: repository() | default | system | xdg | global | local | app | highest.
 %% Configuration source.
 %% If the value is an atom, then:
 %% <dl>
@@ -76,6 +100,7 @@
 
 -export_type([repository/0, commit_opts/0, cat_file_opt/0, checkout_opts/0, checkout_stats/0]).
 -export_type([rev_parse_opts/0, rev_list_opts/0]).
+-export_type([list_index_opts/0, list_index_entry/0]).
 
 -define(LIBNAME, ?MODULE).
 -define(NOT_LOADED_ERROR,
@@ -353,10 +378,54 @@ branch_delete(Repo, Name) ->
 list_branches(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
+%% @doc Add a remote
+-spec remote_add(repository(), binary()|string(), binary()|string()) ->
+        ok | {error, binary()}.
+remote_add(Repo, Name, URL) ->
+  remote_nif(Repo, {add, URL}, to_bin(Name), []).
+
+%% @doc Rename a remote
+-spec remote_rename(repository(), binary()|string(), binary()|string()) ->
+        ok | {error, binary()}.
+remote_rename(Repo, OldName, NewName) ->
+  remote_nif(Repo, {rename, to_bin(NewName)}, to_bin(OldName), []).
+
+%% @doc Delete a remote
+-spec remote_delete(repository(), binary()|string()) ->
+        ok | {error, binary()}.
+remote_delete(Repo, Name) ->
+  remote_nif(Repo, delete, to_bin(Name), []).
+
+%% @doc Delete a remote
+-spec remote_set_url(repository(), binary()|string(), binary()|string()) ->
+        ok | {error, binary()}.
+remote_set_url(Repo, Name, URL) ->
+  remote_set_url(Repo, Name, URL, []).
+
+%% @doc Add a remote.
+%% If `Opts' contains `push', then the repository is pushed ot the remote `URL'.
+remote_set_url(Repo, Name, URL, Opts) ->
+  remote_nif(Repo, {seturl, to_bin(URL)}, to_bin(Name), Opts).
+
+%% @doc List remotes
+-spec list_remotes(repository()) -> [{binary(), binary()}].
+list_remotes(Repo) when is_reference(Repo) ->
+  ?NOT_LOADED_ERROR.
+
 %% @doc List branches
 %% @see list_branches/2
 list_branches(Repo) ->
   list_branches(Repo, []).
+
+%% @doc List index
+%% @see list_index/2
+list_index(Repo) ->
+  list_index(Repo, []).
+
+%% @doc List index.
+-spec list_index(repository(), list_index_opts()) -> [list_index_entry()].
+list_index(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
 
 %%-----------------------------------------------------------------------------
 %% Internal functions
@@ -405,6 +474,9 @@ config_get_nif(Src, Key) when is_reference(Src) orelse is_atom(Src), is_binary(K
   ?NOT_LOADED_ERROR.
 
 config_set_nif(Src, Key, Val) when is_reference(Src) orelse is_atom(Src), is_binary(Key), is_binary(Val) ->
+  ?NOT_LOADED_ERROR.
+
+remote_nif(Repo, _Op, Name, Opts) when is_reference(Repo), is_binary(Name), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
 branch_nif(Repo, Op, Name) when is_reference(Repo), is_atom(Op), is_binary(Name) ->
@@ -555,6 +627,40 @@ branch_test_() ->
     ?_assertNot(has_branch(R, "tmp")),
     ?_assertMatch(ok, git:branch_delete(R, "tmp2")),
     ?_assertNot(has_branch(R, "tmp2"))
+  ].
+
+list_index_test_() ->
+  R = git:open("/tmp/egit"),
+  L = git:list_index(R),
+  M = git:list_index(R, [{fields, all}]),
+  [
+    ?_assert(length(L) >= 24),
+    ?_assertMatch([_], [I || I = #{path := <<"README.md">>} <- git:list_index(R, [{fields, [path]}])]),
+    ?_assertMatch(M, git:list_index(R, [{fields, [path,stage,conflict,oid,mode,size,ctime,mtime]}])),
+    ?_assertEqual(length(L), length(M))
+  ].
+
+remote_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assertEqual([{<<"origin">>,<<"https://github.com/saleyn/egit.git">>,[push,fetch]}], git:list_remotes(R)),
+    ?_assertEqual(
+      {error,<<"Could not rename remote: remote 'upstream' does not exist">>},
+      git:remote_rename(R, "upstream", "upstream2")),
+    ?_assertEqual(
+      ok,
+      git:remote_add(R, "upstream", <<"https://gitlab.com/saleyn/egit.git">>)),
+    ?_assertEqual(
+      {error,<<"Could not create remote: remote 'upstream' already exists">>},
+      git:remote_add(R, "upstream", <<"https://gitlab.com/saleyn/egit.git">>)),
+    ?_assertEqual(ok, git:remote_set_url(R, "upstream", "https://google.com/saleyn/egit.git")),
+    ?_assertEqual(
+      [{<<"origin">>,  <<"https://github.com/saleyn/egit.git">>, [push,fetch]},
+       {<<"upstream">>,<<"https://google.com/saleyn/egit.git">>, [push,fetch]}],
+      git:list_remotes(R)),
+    ?_assertEqual(ok, git:remote_rename(R,  "upstream", "upstream2")),
+    ?_assertEqual(ok, git:remote_delete(R,  "upstream2")),
+    ?_assertEqual([{<<"origin">>,<<"https://github.com/saleyn/egit.git">>,[push,fetch]}], git:list_remotes(R))
   ].
 
 last_test() ->

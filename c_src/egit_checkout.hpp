@@ -2,7 +2,7 @@
 // This code was derived from
 // https://github.com/libgit2/libgit2/blob/main/examples/checkout.c
 //-----------------------------------------------------------------------------
-// libgit2 "checkout" example - perform git checkouts
+// libgit2 "checkout" - perform git checkouts
 //-----------------------------------------------------------------------------
 // Written by the libgit2 contributors
 //
@@ -74,19 +74,16 @@ int resolve_refish(git_annotated_commit** commit, git_repository* repo, const ch
 // to check whether the ref is unique across all remotes.
 static int guess_refish(git_annotated_commit** out, git_repository* repo, const char* ref)
 {
-  git_strarray remotes = { NULL, 0 };
+  GitStrArray remotes;
   int err;
 
   if ((err = git_remote_list(&remotes, repo)) < 0)
     return err;
 
-  auto cleanup = [&remotes]() { git_strarray_dispose(&remotes); };
-  ScopeCleanup scope(cleanup);
-
   SmartPtr<git_reference> remote_ref(git_reference_free);
 
-  for (size_t i = 0; i < remotes.count; i++) {
-    auto refname = std::format("refs/remotes/{}/{}", remotes.strings[i], ref);
+  for (size_t i = 0; i < remotes.size(); i++) {
+    auto refname = std::format("refs/remotes/{}/{}", remotes[i], ref);
     if ((err = git_reference_lookup(&remote_ref, repo, refname.c_str())) < 0 && err != GIT_ENOTFOUND)
       break;
   }

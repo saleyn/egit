@@ -98,6 +98,31 @@ private:
   Deleter m_del;
 };
 
+struct GitStrArray {
+  GitStrArray() : m_array{} {}
+  ~GitStrArray() { if (m_array.strings) git_strarray_dispose(&m_array); }
+
+  git_strarray*       operator&()        { return &m_array; }
+  git_strarray&       operator*()        { return m_array;  }
+  git_strarray const* operator->() const { return &m_array; }
+  git_strarray*       operator->()       { return &m_array; }
+  bool                operator!()  const { return m_array.strings == nullptr; }
+
+  git_strarray const* get()        const { return &m_array; }
+  git_strarray*       get()              { return &m_array; }
+
+  // Cast operator
+  operator const git_strarray*()   const { return &m_array; }
+  operator bool()        const { return !this->operator!(); }
+
+  size_t   size()        const { return m_array.count; }
+
+  const char* operator[](size_t idx) const { return m_array.strings[idx]; }
+private:
+  git_strarray m_array;
+};
+
+
 template <typename T>
 struct ScopeCleanup {
   ScopeCleanup(T fun) : m_fun(fun) {}

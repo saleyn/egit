@@ -31,6 +31,8 @@ namespace std { using namespace fmt; }
 #include "egit_rev_list.hpp"
 #include "egit_config.hpp"
 #include "egit_branch.hpp"
+#include "egit_index.hpp"
+#include "egit_remote.hpp"
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 {
@@ -410,6 +412,48 @@ static ERL_NIF_TERM list_branches_nif(ErlNifEnv* env, int argc, const ERL_NIF_TE
   return lg2_branch_list(env, repo->get(), argv[1]);
 }
 
+static ERL_NIF_TERM list_index_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[1])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_index(env, repo->get(), argv[1]);
+}
+
+static ERL_NIF_TERM remote_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 4);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ERL_NIF_TERM op = argv[1];
+
+  ErlNifBinary name;
+  if (!enif_inspect_binary(env, argv[2], &name) || name.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_remote(env, repo->get(), bin_to_str(name), op, argv[3]);
+}
+
+static ERL_NIF_TERM list_remotes_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 1);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_remotes_list(env, repo->get());
+}
+
 static void resource_dtor(ErlNifEnv* env, void* arg)
 {
   assert(arg);
@@ -456,6 +500,7 @@ static ErlNifFunc egit_funcs[] =
   {"add_nif",           3, add_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"checkout_nif",      3, checkout_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"commit_nif",        2, commit_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"commit_lookup_nif", 3, commit_lookup_nif, 0},
   {"cat_file_nif",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"rev_parse_nif",     3, rev_parse_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"rev_list_nif",      3, rev_list_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
@@ -464,7 +509,9 @@ static ErlNifFunc egit_funcs[] =
   {"branch_nif",        3, branch_nif},
   {"branch_nif",        4, branch_nif},
   {"list_branches",     2, list_branches_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"commit_lookup_nif", 3, commit_lookup_nif, 0},
+  {"list_index",        2, list_index_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"remote_nif",        4, remote_nif},
+  {"list_remotes",      1, list_remotes_nif},
 };
 
 ERL_NIF_INIT(git, egit_funcs, load, NULL, upgrade, NULL);

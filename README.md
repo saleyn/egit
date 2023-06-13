@@ -11,6 +11,7 @@ added.
 
 ## Currently supported functionality
 
+- Init a repository
 - Clone a repository
 - Open a repository at given local path
 - Fetch from remote
@@ -23,6 +24,8 @@ added.
 - Rev-list
 - Branch list/create/rename/delete
 - Configuration get/set at various levels (e.g. system/global/local/app/default)
+- List files in index
+- List/add/delete/rename/set-url on a remote
 
 ## Installation
 

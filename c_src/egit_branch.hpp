@@ -6,7 +6,7 @@
 #include <git2/common.h>
 
 namespace {
-  enum Op {
+  enum class BranchOp {
     CREATE,
     RENAME,
     DELETE,
@@ -81,14 +81,14 @@ done:
 ERL_NIF_TERM lg2_branch(
   ErlNifEnv* env, git_repository* repo, ERL_NIF_TERM op, ERL_NIF_TERM name, ERL_NIF_TERM arg)
 {
-  Op operation;
+  BranchOp operation;
 
   if      (enif_is_identical(ATOM_CREATE, op) && arg && enif_is_list(env, arg))
-    operation = CREATE;
+    operation = BranchOp::CREATE;
   else if (enif_is_identical(ATOM_RENAME, op) && arg && enif_is_list(env, arg))
-    operation = RENAME;
+    operation = BranchOp::RENAME;
   else if (enif_is_identical(ATOM_DELETE, op) && !arg)
-    operation = DELETE;
+    operation = BranchOp::DELETE;
   else [[unlikely]]
     return enif_make_badarg(env);
 
@@ -105,7 +105,7 @@ ERL_NIF_TERM lg2_branch(
   auto                    overwrite = false;
 
   switch (operation) {
-    case CREATE: {
+    case BranchOp::CREATE: {
       std::string target("HEAD");
       // Parse options
       {
@@ -140,7 +140,7 @@ ERL_NIF_TERM lg2_branch(
 
       break;
     }
-    case RENAME: {
+    case BranchOp::RENAME: {
       std::string snew_name;
 
       while (enif_get_list_cell(env, arg, &opt, &arg)) {
@@ -167,7 +167,7 @@ ERL_NIF_TERM lg2_branch(
 
       break;
     }
-    case DELETE: {
+    case BranchOp::DELETE: {
       if (git_branch_lookup(&ref, repo, sname.c_str(), GIT_BRANCH_ALL) != GIT_OK)
         return make_git_error(env, std::format("Failed to find branch {}", sname));
 

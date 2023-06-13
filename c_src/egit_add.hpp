@@ -38,7 +38,7 @@ struct index_options {
   std::vector<ERL_NIF_TERM> files;
 };
 
-/* Forward declarations for helpers */
+// Forward declarations for helpers
 static ERL_NIF_TERM
 parse_opts(ErlNifEnv* env, std::vector<std::string>& file_specs, ERL_NIF_TERM file_specs_list, ERL_NIF_TERM opts, index_options& o)
 {
