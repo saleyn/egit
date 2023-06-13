@@ -9,6 +9,9 @@ on the external `git` tool.
 The project is currently in the alpha stage and more functionality is being
 added.
 
+Repository:    https://github.com/saleyn/egit
+Documentation: https://hexdocs.pm/egit
+
 ## Currently supported functionality
 
 - Init a repository
