@@ -15,11 +15,12 @@ Documentation: https://hexdocs.pm/egit
 
 ## Currently supported functionality
 
-- Init a repository
+- Init a repository (including creation of bare repositories)
 - Clone a repository
 - Open a repository at given local path
 - Fetch from remote
 - Pull from remote
+- Push to remote
 - Add files to repository
 - Commit
 - Checkout
@@ -30,6 +31,7 @@ Documentation: https://hexdocs.pm/egit
 - Configuration get/set at various levels (e.g. system/global/local/app/default)
 - List files in index
 - List/add/delete/rename/set-url on a remote
+- List/create/delete tags
 
 ## Installation
 
@@ -44,7 +46,7 @@ and run:
 $ make
 ```
 
-- For Erlang projects add dependency in `rebar.config`:
+- For Erlang projects add the dependency in `rebar.config`:
 ```erlang
 {deps,
  [% ...
@@ -52,7 +54,7 @@ $ make
  ]}.
 ```
 
-- For Elixir projects add dependency in `mix.exs`:
+- For Elixir projects add the dependency in `mix.exs`:
 ```elixir
 def deps do
  [
@@ -81,7 +83,9 @@ and will be automatically garbage collected when the current process
 exits.
 
 After obtaining a repository reference, you can call functions in the
-`egit` module. E.g.:
+`egit` module.
+
+### Erlang Example
 
 ```erlang
 2> git:branch_create(R, "tmp", [{target, <<"1b74c46">>}]).
@@ -119,18 +123,37 @@ ok
   blob => <<"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n">>}
 ```
 
+### Elixir example
+
+```elixir
+iex(1)> repo = :git.init("/tmp/egit_repo")
+#Reference<0.739271388.2889220102.160795>
+iex(2)> ok = File.write!("/tmp/egit_repo/README.md", <<"This is a test\n">>)
+:ok
+iex(3)> :git.add(v(2), "README.md")
+%{mode: :added, files: ["README.md"]}
+iex(4)> :git.remote_add(repo, "origin", "git@github.com:saleyn/test_repo.git")
+:ok
+iex(5)> :git.list_remotes(repo)
+[{"origin", "git@github.com:saleyn/test_repo.git", [:push, :fetch]}]
+iex(6)> :git.list_index(repo)
+[%{path: "README.md"}]
+iex(7)> :git.commit(repo, "Initial commit")
+{:ok, "dc89c6b26b22f41d34300654f8d36252925d5d67"}
+```
+
 ## Patching
 
 If you find some functionality lacking, feel free to add missing functions
 and submit a PR.  The implementation recommendation would be to use one of
 the [examples](https://github.com/libgit2/libgit2/tree/main/examples)
-provided with `libgit2`, add it as `c_src/egit_*.hpp`, and modify `egit.cpp`
-accordingly.
+provided with `libgit2` as a guide, add the functionality as `lg2_*()`
+function in `c_src/egit_*.hpp`, modify `egit.cpp` to call that function
+accordingly, write unit tests in `egit.erl` and sumbmit a pull request.
 
 ## Author
 
 Serge Aleynikov <saleyn@gmail.com>
-
 
 ## License
 
