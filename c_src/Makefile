@@ -15,28 +15,22 @@ CXX       ?= g++
 
 CXX_VSN   ?= $(shell $(CXX) --version | sed -n '1s/^[^0-9]\+\([0-9]\+\)\(.[0-9-]\)\+.*$$/\1/p')
 
-ifeq ($(STD_FMT),)
-  ifeq ($(basename $(CXX)),g++)
-    ifeq ($(shell expr $(CXX_VSN) \>= 13),1)
-      STD_FMT=1
-    else
-      STD_FMT=0
-    endif
-  else ifeq ($(basename $(CXX)),clang++)
-    ifeq ($(shell expr $(CXX_VSN) \>= 15),1)
-      STD_FMT=1
-    else
-      STD_FMT=0
-    endif
-  else
-    STD_FMT=0
+ifeq ($(basename $(CXX)),g++)
+  ifeq ($(shell expr $(CXX_VSN) \>= 13),1)
+    C20_FEATURES=1
+  endif
+else ifeq ($(basename $(CXX)),clang++)
+  ifeq ($(shell expr $(CXX_VSN) \>= 15),1)
+    C20_FEATURES=1
   endif
 endif
 
-ifeq ($(STD_FMT),0)
-  $(warning ==> $(CXX) major version: $(CXX_VSN))
-  CPPFLAGS += -DFMT_HEADER_ONLY -DUSE_FMT_LIB=1 -Ifmt/include
-endif
+HAVE_FORMAT ?= $(C20_FEATURES)
+HAVE_SRCLOC ?= $(C20_FEATURES)
+
+CPPFLAGS += \
+  $(if $(findstring $(HAVE_FORMAT),1),-DHAVE_FORMAT -DFMT_HEADER_ONLY -Ifmt/include) \
+  $(if $(findstring $(HAVE_SRCLOC),1),-DHAVE_SRCLOC)
 
 # System type and C compiler/flags.
 
@@ -46,14 +40,12 @@ else
   OPTIMIZE = -O0 -g
 endif
 
+CXXFLAGS   ?= -mavx2 -finline-functions -Wall -std=c++20
+
 UNAME_SYS  := $(shell uname -s)
-ifeq ($(UNAME_SYS), Linux)
-  CXXFLAGS ?= -mavx2 -finline-functions -Wall -std=c++20
-else ifeq ($(UNAME_SYS), Darwin)
-  CXXFLAGS ?= -mavx2 -arch x86_64 -finline-functions -Wall -std=c++20 -pie
-  LDFLAGS  ?= -arch x86_64 -flat_namespace -undefined suppress
-else ifeq ($(UNAME_SYS), FreeBSD)
-  CXXFLAGS ?= -mavx2 -finline-functions -Wall -std=c++20
+ifeq ($(UNAME_SYS), Darwin)
+  CXXFLAGS += -pie
+  LDFLAGS  ?= -flat_namespace -undefined suppress
 endif
 
 CXXFLAGS   += $(OPTIMIZE) -fPIC $(ERL_CXXFLAGS)
@@ -84,7 +76,7 @@ $(SO_OUTPUT): $(OBJECTS)
 	$(CXX) $(OBJECTS) $(LDFLAGS) -o $(SO_OUTPUT)
 
 %.o: %.cpp $(wildcard *.hpp)
-	@if [ $(STD_FMT) -eq 0 ]; then \
+	@if [ -z $(C20_FEATURES) ]; then \
 	  echo "==> Updating fmt submodule"; \
 		[ -z "$(shell git config --global safe.directory)" ] && git config --global --add safe.directory '*' || true; \
 		git submodule update --init --recursive; \

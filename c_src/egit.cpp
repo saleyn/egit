@@ -6,7 +6,7 @@
 #include <vector>
 #include <atomic>
 
-#ifndef USE_FMT_LIB
+#ifdef HAVE_FORMAT
 #include <format>
 #else
 #include <fmt/format.h>

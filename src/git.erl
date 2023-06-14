@@ -702,13 +702,13 @@ remote_test_() ->
   [
     ?_assertEqual([{<<"origin">>,<<"https://github.com/saleyn/egit.git">>,[push,fetch]}], git:list_remotes(R)),
     ?_assertMatch(
-      {error,<<"Could not rename remote: remote 'upstream' does not exist [egit_remote.hpp:", _, _, "]">>},
+      {error,<<"Could not rename remote: remote 'upstream' does not exist", _/binary>>},
       git:remote_rename(R, "upstream", "upstream2")),
     ?_assertEqual(
       ok,
       git:remote_add(R, "upstream", <<"https://gitlab.com/saleyn/egit.git">>)),
     ?_assertMatch(
-      {error,<<"Could not create remote: remote 'upstream' already exists [egit_remote.hpp:", _, _, "]">>},
+      {error,<<"Could not create remote: remote 'upstream' already exists", _/binary>>},
       git:remote_add(R, "upstream", <<"https://gitlab.com/saleyn/egit.git">>)),
     ?_assertEqual(ok, git:remote_set_url(R, "upstream", "https://google.com/saleyn/egit.git")),
     ?_assertEqual(

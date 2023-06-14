@@ -5,8 +5,11 @@
 #include <memory>
 #include <type_traits>
 #include <erl_nif.h>
-#include <source_location>
 #include "egit_atoms.hpp"
+
+#ifdef HAVE_SRCLOC
+#include <source_location>
+#endif
 
 static ErlNifResourceType* GIT_REPO_RESOURCE;
 
@@ -184,6 +187,7 @@ inline std::string atom_to_str(ErlNifEnv* env, ERL_NIF_TERM atom) {
   return s;
 }
 
+#ifdef HAVE_SRCLOC
 inline const char* basename(const char* path)
 {
   auto p = path + strlen(path);
@@ -198,8 +202,13 @@ inline ERL_NIF_TERM src_info(ErlNifEnv* env, const std::source_location& loc)
   snprintf(buf, sizeof(buf), "%s:%d", basename(loc.file_name()), loc.line());
   return make_binary(env, buf);
 }
+#endif
 
-inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx, const std::source_location& loc)
+inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx
+#ifdef HAVE_SRCLOC
+  , const std::source_location& loc
+#endif
+)
 {
   char        buf[256];
   const char* delim = "";
@@ -211,29 +220,51 @@ inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx, const 
   if (git_error_last() && !pfx.empty())
     delim = ": ";
 
+#ifdef HAVE_SRCLOC
   snprintf(buf, sizeof(buf), "%s%s%s [%s:%d]", pfx.c_str(), delim, err, basename(loc.file_name()), loc.line());
+#else
+  snprintf(buf, sizeof(buf), "%s%s%s", pfx.c_str(), delim, err);
+#endif
   return make_binary(env, buf);
 }
 
-inline ERL_NIF_TERM raise_git_exception(ErlNifEnv* env, std::string const& pfx,
-                                        const std::source_location loc =
-                                        std::source_location::current())
+inline ERL_NIF_TERM raise_git_exception(ErlNifEnv* env, std::string const& pfx
+#ifdef HAVE_SRCLOC
+  , const std::source_location loc = std::source_location::current()
+#endif
+)
 {
-  return enif_raise_exception(env, fmt_git_error(env, pfx, loc));
+  return enif_raise_exception(env, fmt_git_error(env, pfx
+#ifdef HAVE_SRCLOC
+  , loc
+#endif
+  ));
 }
 
-inline ERL_NIF_TERM raise_badarg_exception(ErlNifEnv* env, ERL_NIF_TERM err,
-                                           const std::source_location loc =
-                                           std::source_location::current())
+inline ERL_NIF_TERM raise_badarg_exception(ErlNifEnv* env, ERL_NIF_TERM err
+#ifdef HAVE_SRCLOC
+  , const std::source_location loc = std::source_location::current()
+#endif
+)
 {
+#ifdef HAVE_SRCLOC
   return enif_raise_exception(env, enif_make_tuple3(env, ATOM_BADARG, err, src_info(env, loc)));
+#else
+  return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, err));
+#endif
 }
 
-inline ERL_NIF_TERM make_git_error(ErlNifEnv* env, std::string const& pfx,
-                                   const std::source_location loc =
-                                   std::source_location::current())
+inline ERL_NIF_TERM make_git_error(ErlNifEnv* env, std::string const& pfx
+#ifdef HAVE_SRCLOC
+  , const std::source_location loc = std::source_location::current()
+#endif
+)
 {
-  return enif_make_tuple2(env, ATOM_ERROR, fmt_git_error(env, pfx, loc));
+  return enif_make_tuple2(env, ATOM_ERROR, fmt_git_error(env, pfx
+#ifdef HAVE_SRCLOC
+  , loc
+#endif
+  ));
 }
 
 inline ERL_NIF_TERM make_error(ErlNifEnv* env, std::string_view const& err)
