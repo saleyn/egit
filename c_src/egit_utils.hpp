@@ -5,6 +5,7 @@
 #include <memory>
 #include <type_traits>
 #include <erl_nif.h>
+#include <source_location>
 #include "egit_atoms.hpp"
 
 static ErlNifResourceType* GIT_REPO_RESOURCE;
@@ -183,7 +184,22 @@ inline std::string atom_to_str(ErlNifEnv* env, ERL_NIF_TERM atom) {
   return s;
 }
 
-inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx)
+inline const char* basename(const char* path)
+{
+  auto p = path + strlen(path);
+  for (; p > path && *p != '/'; --p);
+  if (*p == '/') ++p;
+  return p;
+}
+
+inline ERL_NIF_TERM src_info(ErlNifEnv* env, const std::source_location& loc)
+{
+  char buf[128];
+  snprintf(buf, sizeof(buf), "%s:%d", basename(loc.file_name()), loc.line());
+  return make_binary(env, buf);
+}
+
+inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx, const std::source_location& loc)
 {
   char        buf[256];
   const char* delim = "";
@@ -195,23 +211,29 @@ inline ERL_NIF_TERM fmt_git_error(ErlNifEnv* env, std::string const& pfx)
   if (git_error_last() && !pfx.empty())
     delim = ": ";
 
-  snprintf(buf, sizeof(buf), "%s%s%s", pfx.c_str(), delim, err);
+  snprintf(buf, sizeof(buf), "%s%s%s [%s:%d]", pfx.c_str(), delim, err, basename(loc.file_name()), loc.line());
   return make_binary(env, buf);
 }
 
-inline ERL_NIF_TERM raise_git_exception(ErlNifEnv* env, std::string const& pfx)
+inline ERL_NIF_TERM raise_git_exception(ErlNifEnv* env, std::string const& pfx,
+                                        const std::source_location loc =
+                                        std::source_location::current())
 {
-  return enif_raise_exception(env, fmt_git_error(env, pfx));
+  return enif_raise_exception(env, fmt_git_error(env, pfx, loc));
 }
 
-inline ERL_NIF_TERM raise_badarg_exception(ErlNifEnv* env, ERL_NIF_TERM err)
+inline ERL_NIF_TERM raise_badarg_exception(ErlNifEnv* env, ERL_NIF_TERM err,
+                                           const std::source_location loc =
+                                           std::source_location::current())
 {
-  return enif_raise_exception(env, enif_make_tuple2(env, ATOM_BADARG, err));
+  return enif_raise_exception(env, enif_make_tuple3(env, ATOM_BADARG, err, src_info(env, loc)));
 }
 
-inline ERL_NIF_TERM make_git_error(ErlNifEnv* env, std::string const& pfx)
+inline ERL_NIF_TERM make_git_error(ErlNifEnv* env, std::string const& pfx,
+                                   const std::source_location loc =
+                                   std::source_location::current())
 {
-  return enif_make_tuple2(env, ATOM_ERROR, fmt_git_error(env, pfx));
+  return enif_make_tuple2(env, ATOM_ERROR, fmt_git_error(env, pfx, loc));
 }
 
 inline ERL_NIF_TERM make_error(ErlNifEnv* env, std::string_view const& err)
@@ -222,4 +244,26 @@ inline ERL_NIF_TERM make_error(ErlNifEnv* env, std::string_view const& err)
 inline ERL_NIF_TERM make_error(ErlNifEnv* env, ERL_NIF_TERM err)
 {
   return enif_make_tuple2(env, ATOM_ERROR, err);
+}
+
+template <typename T>
+inline bool parse_if(ErlNifEnv*, ERL_NIF_TERM match_term, const ERL_NIF_TERM kv[], T& val);
+
+template <>
+inline bool parse_if(ErlNifEnv* env, ERL_NIF_TERM match_term, const ERL_NIF_TERM kv[], std::string& val)
+{
+  ErlNifBinary bin;
+  auto res = enif_is_identical(kv[0], match_term) && enif_inspect_binary(env, kv[1], &bin);
+  if (res) val = bin_to_str(bin);
+  return res;
+}
+
+template <typename T>
+requires std::is_integral<T>::value
+bool parse_if(ErlNifEnv* env, ERL_NIF_TERM match_term, const ERL_NIF_TERM kv[], T& val)
+{
+  int64_t v;
+  auto res = enif_is_identical(kv[0], match_term) && enif_get_int64(env, kv[1], &v);
+  if (res) val = T(v);
+  return res;
 }

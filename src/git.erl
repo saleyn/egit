@@ -10,6 +10,7 @@
 -export([list_branches/1, list_branches/2,  list_index/1, list_index/2]).
 -export([list_remotes/1,  remote_add/3,     remote_rename/3,
          remote_delete/2, remote_set_url/3, remote_set_url/4]).
+-export([tag_create/2, tag_create/3, tag_create/4, tag_delete/2, list_tags/1, list_tags/2]).
 
 -on_load(on_load/0).
 
@@ -98,8 +99,19 @@
 %% <dt>{target, Commit}</dt><dd>Use the target commit (default `<<"HEAD">>')</dd>
 %% </dl>
 
+-type tag_opt()  :: [{message, binary()} | {pattern, binary()} | {target, binary()} | {lines, integer()}].
+%% Tag creation options
+%% <dl>
+%% <dt>{message, Msg}</dt><dd>Message associated with the tag's commit</dd>
+%% <dt>{pattern, Pat}</dt><dd>Pattern to search matching tags</dd>
+%% <dt>{target,  SHA}</dt><dd>Target commit SHA to be associated with the tag</dd>
+%% <dt>{lines,   Num}</dt><dd>Number of lines in the commit to store</dd>
+%% </dl>
+
+-type tag_opts() :: [tag_opt()].
+
 -export_type([repository/0, commit_opts/0, cat_file_opt/0, checkout_opts/0, checkout_stats/0]).
--export_type([rev_parse_opts/0, rev_list_opts/0]).
+-export_type([rev_parse_opts/0, rev_list_opts/0, tag_opts/0]).
 -export_type([list_index_opts/0, list_index_entry/0]).
 
 -define(LIBNAME, ?MODULE).
@@ -427,6 +439,48 @@ list_index(Repo) ->
 list_index(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
+%% @doc Create a tag
+-spec tag_create(repository(), string()|binary()) ->
+        ok | {error, binary()|atom()}.
+tag_create(Repo, Tag) ->
+  tag_create(Repo, Tag, nil, []).
+
+%% @doc Create a tag
+-spec tag_create(repository(), string()|binary(), nil|string()|binary()) ->
+        ok | {error, binary()|atom()}.
+tag_create(Repo, Tag, Msg) ->
+  tag_create(Repo, Tag, Msg, []).
+
+%% @doc Create a tag
+-spec tag_create(repository(), string()|binary(), nil|string()|binary(), tag_opts()) ->
+        ok | {error, binary()|atom()}.
+tag_create(Repo, Tag, Msg, Opts) when Msg==nil; Msg==undefined ->
+  tag_nif(Repo, create, to_bin(Tag), Opts);
+tag_create(Repo, Tag, Msg, Opts0) when is_list(Msg); is_binary(Msg) ->
+  Opts = [case X of
+            {I, M} when is_list(M) -> {I, to_bin(M)};
+            {_, _} -> X;
+            I when is_atom(I) -> X
+          end || X <- [{message, Msg} | Opts0]],
+  tag_nif(Repo, create, to_bin(Tag), Opts).
+
+%% @doc Delete a tag
+-spec tag_delete(repository(), string()|binary()) -> ok | {error, binary()|atom()}.
+tag_delete(Repo, Tag) ->
+  tag_nif(Repo, delete, to_bin(Tag), []).
+
+%% @doc List all tags
+-spec list_tags(repository()) ->
+        [binary()|{binary(), binary()}] | {error, binary()|atom()}.
+list_tags(Repo) ->
+  tag_nif(Repo, list, <<"">>, []).
+
+%% @doc List all tags
+-spec list_tags(repository(), string()|binary()) ->
+        [binary()|{binary(), binary()}] | {error, binary()|atom()}.
+list_tags(Repo, Pattern) ->
+  tag_nif(Repo, list, <<"">>, [{pattern, to_bin(Pattern)}]).
+
 %%-----------------------------------------------------------------------------
 %% Internal functions
 %%-----------------------------------------------------------------------------
@@ -485,6 +539,9 @@ branch_nif(Repo, Op, Name) when is_reference(Repo), is_atom(Op), is_binary(Name)
 branch_nif(Repo, Op, OldName, NewNameOrOpt)
   when is_reference(Repo), is_atom(Op)
      , is_binary(OldName), is_binary(NewNameOrOpt) orelse is_list(NewNameOrOpt) ->
+  ?NOT_LOADED_ERROR.
+
+tag_nif(Repo, Op, Tag, Opts) when is_reference(Repo), is_atom(Op), is_binary(Tag), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
 -ifdef(EUNIT).
@@ -644,14 +701,14 @@ remote_test_() ->
   R = git:open("/tmp/egit"),
   [
     ?_assertEqual([{<<"origin">>,<<"https://github.com/saleyn/egit.git">>,[push,fetch]}], git:list_remotes(R)),
-    ?_assertEqual(
-      {error,<<"Could not rename remote: remote 'upstream' does not exist">>},
+    ?_assertMatch(
+      {error,<<"Could not rename remote: remote 'upstream' does not exist [egit_remote.hpp:", _, _, "]">>},
       git:remote_rename(R, "upstream", "upstream2")),
     ?_assertEqual(
       ok,
       git:remote_add(R, "upstream", <<"https://gitlab.com/saleyn/egit.git">>)),
-    ?_assertEqual(
-      {error,<<"Could not create remote: remote 'upstream' already exists">>},
+    ?_assertMatch(
+      {error,<<"Could not create remote: remote 'upstream' already exists [egit_remote.hpp:", _, _, "]">>},
       git:remote_add(R, "upstream", <<"https://gitlab.com/saleyn/egit.git">>)),
     ?_assertEqual(ok, git:remote_set_url(R, "upstream", "https://google.com/saleyn/egit.git")),
     ?_assertEqual(
@@ -661,6 +718,17 @@ remote_test_() ->
     ?_assertEqual(ok, git:remote_rename(R,  "upstream", "upstream2")),
     ?_assertEqual(ok, git:remote_delete(R,  "upstream2")),
     ?_assertEqual([{<<"origin">>,<<"https://github.com/saleyn/egit.git">>,[push,fetch]}], git:list_remotes(R))
+  ].
+
+tag_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+     ?_assertEqual(ok, git:tag_create(R, "v0.0.1", "This is a test\n", [{target, "f791f01"}])),
+     ?_assertEqual(ok, git:tag_create(R, "v0.0.2")),
+     ?_assertEqual([], [T || T <- git:list_tags(R), not lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])]),
+     ?_assertEqual(ok, git:tag_delete(R, "v0.0.1")),
+     ?_assertEqual(ok, git:tag_delete(R, "v0.0.2")),
+     ?_assertEqual([], [T || T <- git:list_tags(R), not lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])])
   ].
 
 last_test() ->

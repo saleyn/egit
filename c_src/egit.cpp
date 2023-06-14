@@ -33,6 +33,7 @@ namespace std { using namespace fmt; }
 #include "egit_branch.hpp"
 #include "egit_index.hpp"
 #include "egit_remote.hpp"
+#include "egit_tag.hpp"
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 {
@@ -440,6 +441,9 @@ static ERL_NIF_TERM remote_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
   if (!enif_inspect_binary(env, argv[2], &name) || name.size == 0) [[unlikely]]
     return enif_make_badarg(env);
 
+  if (!(enif_is_tuple(env, op) || enif_is_atom(env, op)) || !enif_is_list(env, argv[3])) [[unlikely]]
+    return enif_make_badarg(env);
+
   return lg2_remote(env, repo->get(), bin_to_str(name), op, argv[3]);
 }
 
@@ -452,6 +456,26 @@ static ERL_NIF_TERM list_remotes_nif(ErlNifEnv* env, int argc, const ERL_NIF_TER
     return enif_make_badarg(env);
 
   return lg2_remotes_list(env, repo->get());
+}
+
+static ERL_NIF_TERM tag_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 4);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ERL_NIF_TERM op = argv[1];
+
+  ErlNifBinary name;
+  if (!enif_inspect_binary(env, argv[2], &name)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_atom(env, op) || !enif_is_list(env, argv[3])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_tag(env, repo->get(), bin_to_str(name), op, argv[3]);
 }
 
 static void resource_dtor(ErlNifEnv* env, void* arg)
@@ -511,6 +535,7 @@ static ErlNifFunc egit_funcs[] =
   {"list_branches",     2, list_branches_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"list_index",        2, list_index_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"remote_nif",        4, remote_nif},
+  {"tag_nif",           4, tag_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"list_remotes",      1, list_remotes_nif},
 };
 
