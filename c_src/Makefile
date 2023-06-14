@@ -29,7 +29,7 @@ HAVE_FORMAT ?= $(C20_FEATURES)
 HAVE_SRCLOC ?= $(C20_FEATURES)
 
 CPPFLAGS += \
-  $(if $(findstring $(HAVE_FORMAT),1),-DHAVE_FORMAT -DFMT_HEADER_ONLY -Ifmt/include) \
+  $(if $(findstring $(HAVE_FORMAT),1),-DHAVE_FORMAT,-DFMT_HEADER_ONLY -Ifmt/include -Wno-array-bounds -Wno-stringop-overflow) \
   $(if $(findstring $(HAVE_SRCLOC),1),-DHAVE_SRCLOC)
 
 # System type and C compiler/flags.
