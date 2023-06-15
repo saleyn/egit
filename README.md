@@ -80,7 +80,7 @@ To open a local repository, give it a path:
 ```
 
 All functions accept either charlists or binaries as arguments, so
-they work equally convenient in Erlang and Elixir.
+they work conveniently in Erlang and Elixir.
 
 The cloned/opened repository resource is owned by the current process,
 and will be automatically garbage collected when the owner process
