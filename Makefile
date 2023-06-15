@@ -14,3 +14,9 @@ test:
 
 run:
 	$(REBAR) shell
+
+docs:
+	$(REBAR) ex_doc
+
+publish cut:
+	$(REBAR) hex $@ -r hexpm $(if $(replace),--replace) $(if $(noconfirm),--yes)

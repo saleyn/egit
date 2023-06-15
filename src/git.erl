@@ -166,7 +166,7 @@ on_load() ->
   erlang:load_nif(SoName, []).
 
 %% @doc Init a repository.
-%% @see init/2 with `Opts = []'.
+%% @see init/2
 -spec init(binary()|string()) -> repository().
 init(Path) -> init(Path, []).
 
@@ -271,7 +271,7 @@ add_all(Repo) when is_reference(Repo) ->
   add_nif(Repo, [<<".">>], []).
 
 %% @doc Add files matching `PathSpecs' to index
-%% @see add/3 with `Opts = []'.
+%% @see add/3
 -spec add(repository(), binary()|string()|[binary()|string()]) -> add_result().
 add(Repo, [C|_] = PathSpec) when is_integer(C), C >= 32, C < 256 ->
   add_nif(Repo, [to_bin(PathSpec)], []);
@@ -400,7 +400,7 @@ config_set(Src, Key, Val) ->
   config_set_nif(Src, to_bin(Key), to_bin(Val)).
 
 %% @doc Create a branch
-%% @see git:branch_create/3 with `Opts = []'.
+%% @see git:branch_create/3
 branch_create(Repo, Name) ->
   branch_create(Repo, Name, []).
 
@@ -418,7 +418,7 @@ branch_create(Repo, Name, Opts) when is_list(Opts) ->
   branch_nif(Repo, create, to_bin(Name), Opts).
 
 %% @doc Rename a branch
-%% @see branch_rename/4 with `Opts = []'.
+%% @see branch_rename/4
 branch_rename(Repo, OldName, NewName) ->
   branch_rename(Repo, OldName, NewName, []).
 
@@ -474,12 +474,12 @@ list_remotes(Repo) when is_reference(Repo) ->
   ?NOT_LOADED_ERROR.
 
 %% @doc List branches
-%% @see list_branches/2 with `Opts = []'.
+%% @see list_branches/2
 list_branches(Repo) ->
   list_branches(Repo, []).
 
 %% @doc List index
-%% @see list_index/2 with `Opts = []'.
+%% @see list_index/2
 list_index(Repo) ->
   list_index(Repo, []).
 
