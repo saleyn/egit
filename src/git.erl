@@ -10,7 +10,8 @@
 -export([list_branches/1, list_branches/2,  list_index/1, list_index/2]).
 -export([list_remotes/1,  remote_add/3,     remote_rename/3,
          remote_delete/2, remote_set_url/3, remote_set_url/4]).
--export([tag_create/2, tag_create/3, tag_create/4, tag_delete/2, list_tags/1, list_tags/2]).
+-export([tag_create/2, tag_create/3, tag_create/4, tag_delete/2]).
+-export([list_tags/1, list_tags/2]).
 -export([status/1, status/2, reset/2]).
 
 -on_load(on_load/0).
@@ -40,9 +41,11 @@
 
 -type add_opt()         :: verbose | dry_run | update | force.
 -type add_opts()        :: [add_opt()].
--type add_result()      :: nil | #{mode => dry_run | added, files => [binary()]} | {error, term()}.
-
--type rev_list_opt()    :: [topo_order | date_order | reverse | {limit, pos_integer()} | {abbrev, pos_integer()}].
+-type add_result()      :: nil |
+                           #{mode => dry_run | added, files => [binary()]} |
+                           {error, term()}.
+-type rev_list_opt()    :: [topo_order | date_order | reverse | 
+                            {limit, pos_integer()} | {abbrev, pos_integer()}].
 -type rev_list_opts()   :: [rev_list_opt()].
 
 -type rev_parse_opt()   :: {abbrev, pos_integer()}.
@@ -66,7 +69,7 @@
 %% <dl>
 %% <dt>{abbrev, `NumChars'}</dt>
 %%   <dd>NumChars truncates the commit hash (must be less then 40).</dd>
-%% <dt>{fields, ListOfFields}</dt>
+%% <dt>{fields, `ListOfFields'}</dt>
 %%   <dd>Field list to return. If not specified, the option will default
 %%       to `[path]'.</dd>
 %% </dl>
@@ -80,7 +83,7 @@
   ctime    => pos_integer(), mtime => pos_integer()
 }.
 
--type cfg_source()       :: repository() | default | system | xdg | global | local | app | highest.
+-type cfg_source() :: repository() | default | system | xdg | global | local | app | highest.
 %% Configuration source.
 %% If the value is an atom, then:
 %% <dl>
@@ -100,13 +103,13 @@
 %% <dt>{target, Commit}</dt><dd>Use the target commit (default `<<"HEAD">>')</dd>
 %% </dl>
 
--type tag_opt()  :: [{message, binary()} | {pattern, binary()} | {target, binary()} | {lines, integer()}].
+-type tag_opt() :: [{message, binary()} | {pattern, binary()} | {target, binary()} | {lines, integer()}].
 %% Tag creation options
 %% <dl>
-%% <dt>{message, Msg}</dt><dd>Message associated with the tag's commit</dd>
-%% <dt>{pattern, Pat}</dt><dd>Pattern to search matching tags</dd>
-%% <dt>{target,  SHA}</dt><dd>Target commit SHA to be associated with the tag</dd>
-%% <dt>{lines,   Num}</dt><dd>Number of lines in the commit to store</dd>
+%% <dt>{message, `Msg'}</dt><dd>Message associated with the tag's commit</dd>
+%% <dt>{pattern, `Pat'}</dt><dd>Pattern to search matching tags</dd>
+%% <dt>{target,  `SHA'}</dt><dd>Target commit SHA to be associated with the tag</dd>
+%% <dt>{lines,   `Num'}</dt><dd>Number of lines in the commit to store</dd>
 %% </dl>
 
 -type tag_opts() :: [tag_opt()].
@@ -116,7 +119,7 @@
   branch | ignored | submodules | ignore_submodules.
 %% Status function options
 %% <dl>
-%% <dt>{untracked, Untracked}</dt>
+%% <dt>{untracked, `Untracked'}</dt>
 %%  `Untracked' can be one of:
 %%  <dd>
 %%    <du>
@@ -125,7 +128,7 @@
 %%    <li>`recursive' - include untracked files and recurse into untracked directories</li>
 %%    </du>
 %%  </dd>
-%% <dt>{paths, Paths}</dt><dd>`Path' is an array of path patterns to match</dd>
+%% <dt>{paths, `Paths'}</dt><dd>`Path' is an array of path patterns to match</dd>
 %% <dt>branch</dt><dd>Include branch name</dd>
 %% <dt>ignored</dt><dd>Include ignored files</dd>
 %% <dt>ignore_submodules</dt><dd>Indicates that submodules should be skipped</dd>
@@ -163,7 +166,7 @@ on_load() ->
   erlang:load_nif(SoName, []).
 
 %% @doc Init a repository.
-%% @see init/2.
+%% @see init/2 with `Opts = []'.
 -spec init(binary()|string()) -> repository().
 init(Path) -> init(Path, []).
 
@@ -225,7 +228,7 @@ cat_file(Repo, Rev) ->
 %% 1> R = git:open(".").
 %% 2> git:cat_file(R, "main", [{abbrev, 5}]).
 %% #{type => commit,
-%%   author => {<<"Serge Aleynikov">>,<<"test@gmail.com">>,1686195121, -14400},
+%%   author => {<<"John Doh">>,<<"test@gmail.com">>,1686195121, -14400},
 %%   oid => <<"b85d0">>,
 %%   parents => [<<"1fd4b">>]}
 %% 7> git:cat_file(R, "b85d0", [{abbrev, 5}]).
@@ -246,7 +249,8 @@ cat_file(Repo, Rev) ->
 %% #{type => blob,
 %%   blob => <<"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n">>}
 %% '''
--spec cat_file(repository(), binary()|string(), cat_file_opts()) -> {ok, term()} | {error, term()}.
+-spec cat_file(repository(), binary()|string(), cat_file_opts()) ->
+        {ok, term()} | {error, term()}.
 cat_file(Repo, Rev, Opts) ->
   cat_file_nif(Repo, to_bin(Rev), Opts).
 
@@ -266,7 +270,8 @@ checkout(Repo, Revision, Opts) ->
 add_all(Repo) when is_reference(Repo) ->
   add_nif(Repo, [<<".">>], []).
 
-%% @doc Same as `add(Repo, FileSpecs, Opts)'.
+%% @doc Add files matching `PathSpecs' to index
+%% @see add/3 with `Opts = []'.
 -spec add(repository(), binary()|string()|[binary()|string()]) -> add_result().
 add(Repo, [C|_] = PathSpec) when is_integer(C), C >= 32, C < 256 ->
   add_nif(Repo, [to_bin(PathSpec)], []);
@@ -275,7 +280,7 @@ add(Repo, PathSpecs) when is_list(PathSpecs) ->
 add(Repo, PathSpec) when is_binary(PathSpec) ->
   add_nif(Repo, [PathSpec], []).
 
-%% @doc Add files matching `PathSpecs' to index.
+%% @doc Add files matching `PathSpecs' to index with options
 -spec add(repository(), [binary()|string()], add_opts()) -> add_result().
 add(Repo, [C|_] = PathSpecs, Opts) when is_integer(C), C >= 32, C < 256 ->
   add_nif(Repo, [to_bin(PathSpecs)], Opts);
@@ -285,7 +290,8 @@ add(Repo, PathSpecs, Opts) when is_list(PathSpecs)->
   add_nif(Repo, [to_bin(B) || B <- PathSpecs], Opts).
 
 %% @doc Commit changes to a repository
--spec commit(repository(), binary()|string()) -> {ok, OID::binary()} | {error, binary()|atom()}.
+-spec commit(repository(), binary()|string()) ->
+        {ok, OID::binary()} | {error, binary()|atom()}.
 commit(_Repo, Comment) ->
   commit_nif(_Repo, to_bin(Comment)).
 
@@ -316,12 +322,14 @@ commit(_Repo, Comment) ->
 %% git:rev_parse(R,<<"HEAD...HEAD~4">>, [{abbrev, 7}]).
 %% #{from => <<"f791f01">>,merge_base => <<"6d6f662">>, to => <<"6d6f662">>}
 %% '''
--spec rev_parse(repository(), binary()|string(), rev_parse_opts()) -> {ok, binary()} | map() | {error, binary()|atom()}.
+-spec rev_parse(repository(), binary()|string(), rev_parse_opts()) ->
+        {ok, binary()} | map() | {error, binary()|atom()}.
 rev_parse(Repo, Spec, Opts) ->
   rev_parse_nif(Repo, to_bin(Spec), Opts).
 
 %% @doc Same as `rev_parse(Repo, Spec, [])'.
--spec rev_parse(repository(), binary()|string()) -> {ok, binary()} | map() | {error, binary()|atom()}.
+-spec rev_parse(repository(), binary()|string()) ->
+        {ok, binary()} | map() | {error, binary()|atom()}.
 rev_parse(Repo, Spec) ->
   rev_parse(Repo, Spec, []).
 
@@ -342,7 +350,8 @@ rev_parse(Repo, Spec) ->
 %% 9> git:rev_list(R, ["HEAD"], [{limit, 4}, {abbrev, 7}]).
 %% [<<"f791f01">>,<<"1b74c46">>,<<"c40374d">>,<<"12968bd">>]
 %% '''
--spec rev_list(repository(), ['not'|'Elixir.Not'|binary()], rev_list_opts()) -> #{commit_opt() => term()}.
+-spec rev_list(repository(), ['not'|'Elixir.Not'|binary()], rev_list_opts()) ->
+        #{commit_opt() => term()}.
 rev_list(Repo, Specs, Opts) when is_list(Specs) ->
   F = fun
     ('not')               -> 'not';
@@ -359,7 +368,8 @@ rev_list(Repo, Specs, Opts) when is_list(Specs) ->
   rev_list_nif(Repo, L, Opts).
 
 %% @doc Lookup commit details identified by OID
--spec commit_lookup(repository(), binary()|string(), [commit_opt()]) -> #{commit_opt() => term()}.
+-spec commit_lookup(repository(), binary()|string(), [commit_opt()]) ->
+        #{commit_opt() => term()}.
 commit_lookup(Repo, OID, Opts) ->
   commit_lookup_nif(Repo, to_bin(OID), Opts).
 
@@ -369,9 +379,10 @@ commit_lookup(Repo, OID, Opts) ->
 %% 1> R = git:clone(<<"https://github.com/saleyn/egit.git">>, "/tmp/egit").
 %% #Ref<0.170091758.2335834136.12133>
 %% 2> git:config_get(R, "user.name").
-%% {ok,<<"Serge Aleynikov">>}
+%% {ok,<<"John Doh">>}
 %% '''
--spec config_get(cfg_source(), binary()|string()) -> {ok, binary()} | {error, binary()|atom()}.
+-spec config_get(cfg_source(), binary()|string()) ->
+         {ok, binary()} | {error, binary()|atom()}.
 config_get(Src, Key) ->
   config_get_nif(Src, to_bin(Key)).
 
@@ -389,7 +400,7 @@ config_set(Src, Key, Val) ->
   config_set_nif(Src, to_bin(Key), to_bin(Val)).
 
 %% @doc Create a branch
-%% @see git:branch_create/3.
+%% @see git:branch_create/3 with `Opts = []'.
 branch_create(Repo, Name) ->
   branch_create(Repo, Name, []).
 
@@ -407,7 +418,7 @@ branch_create(Repo, Name, Opts) when is_list(Opts) ->
   branch_nif(Repo, create, to_bin(Name), Opts).
 
 %% @doc Rename a branch
-%% @see branch_rename/4
+%% @see branch_rename/4 with `Opts = []'.
 branch_rename(Repo, OldName, NewName) ->
   branch_rename(Repo, OldName, NewName, []).
 
@@ -463,12 +474,12 @@ list_remotes(Repo) when is_reference(Repo) ->
   ?NOT_LOADED_ERROR.
 
 %% @doc List branches
-%% @see list_branches/2
+%% @see list_branches/2 with `Opts = []'.
 list_branches(Repo) ->
   list_branches(Repo, []).
 
 %% @doc List index
-%% @see list_index/2
+%% @see list_index/2 with `Opts = []'.
 list_index(Repo) ->
   list_index(Repo, []).
 

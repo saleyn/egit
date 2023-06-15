@@ -67,7 +67,6 @@ end
 
 ## Usage
 
-Include
 To clone a repository, give it a URL and a local path:
 ```erlang
 1> Repo = git:clone("http://github.com/saleyn/egit.git", "/tmp").
@@ -80,12 +79,16 @@ To open a local repository, give it a path:
 #Ref<...>
 ```
 
+All functions accept either charlists or binaries as arguments, so
+they work equally convenient in Erlang and Elixir.
+
 The cloned/opened repository resource is owned by the current process,
-and will be automatically garbage collected when the current process
+and will be automatically garbage collected when the owner process
 exits.
 
 After obtaining a repository reference, you can call functions in the
-`egit` module.
+`git` module as illustrated below. For complete reference of supported
+functions see the [documentation](https://hexdocs.pm/egit/git.html).
 
 ### Erlang Example
 
