@@ -11,7 +11,7 @@
 -export([list_remotes/1,  remote_add/3,     remote_rename/3,
          remote_delete/2, remote_set_url/3, remote_set_url/4]).
 -export([tag_create/2, tag_create/3, tag_create/4, tag_delete/2, list_tags/1, list_tags/2]).
--export([status/1, status/2]).
+-export([status/1, status/2, reset/2]).
 
 -on_load(on_load/0).
 
@@ -529,6 +529,26 @@ status(Repo) ->
 status(Repo, Opts) ->
   status_nif(Repo, Opts).
 
+%% @doc Get repository reset.
+%% The reset `Type' is one of:
+%% <dl>
+%% <dt>soft</dt><dd>The HEAD will be moved to the commit</dd>
+%% <dt>mixed</dt>
+%%   <dd>Do a SOFT reset, plus the index will be replaced with the content of
+%%       the commit tree</dd>
+%% <dt>hard</dt>
+%%   <dd>Do a MIXED reset and the working directory will be replaced with the
+%%       content of the index. Untracked and ignored files will be left alone.
+%%   </dd>
+%% </dl>
+-spec reset(repository(), soft|mixed|hard, string()|binary()) -> ok | {error, term()}.
+reset(Repo, Type, Ref) ->
+  reset_nif(Repo, Type, to_bin(Ref)).
+
+-spec reset(repository(), soft|mixed|hard) -> ok | {error, term()}.
+reset(Repo, Type) ->
+  reset(Repo, Type, "HEAD").
+
 %%-----------------------------------------------------------------------------
 %% Internal functions
 %%-----------------------------------------------------------------------------
@@ -596,6 +616,9 @@ tag_nif(Repo, Op, Tag, Opts) when is_reference(Repo), is_atom(Op), is_binary(Tag
   ?NOT_LOADED_ERROR.
 
 status_nif(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+reset_nif(Repo, Type, Ref) when is_reference(Repo), is_atom(Type), is_binary(Ref) ->
   ?NOT_LOADED_ERROR.
 
 -ifdef(EUNIT).
@@ -799,7 +822,20 @@ status_test_() ->
     ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R, [{untracked, recursive}])),
     ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R)),
     ?_assertEqual(#{mode => added, files => [<<"test.txt">>]}, git:add(R, "test.txt")),
-    ?_assertEqual(#{index => [{new, <<"test.txt">>}]}, git:status(R))
+    ?_assertEqual(#{index => [{new, <<"test.txt">>}]}, git:status(R)),
+    ?_assertEqual(ok, file:delete("/tmp/egit/test.txt"))
+  ].
+
+reset_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assertEqual(ok, git:reset(R, hard)),
+    ?_assertEqual(ok, file:write_file(<<"/tmp/egit/test.txt">>, <<"Test\n">>)),
+    ?_assertEqual(#{mode => added, files => [<<"test.txt">>]}, git:add(R, "test.txt")),
+    ?_assertEqual(#{index => [{new, <<"test.txt">>}]}, git:status(R)),
+    ?_assertEqual(ok, git:reset(R, hard)),
+    ?_assertEqual(#{}, git:status(R)),
+    ?_assertMatch(_, file:delete("/tmp/egit/test.txt"))
   ].
 
 last_test() ->

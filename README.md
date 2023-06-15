@@ -33,6 +33,7 @@ Documentation: https://hexdocs.pm/egit
 - List files in index
 - List/add/delete/rename/set-url on a remote
 - List/create/delete tags
+- Reset
 
 ## Installation
 

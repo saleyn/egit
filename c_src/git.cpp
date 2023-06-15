@@ -542,6 +542,35 @@ static ERL_NIF_TERM status_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
   return lg2_status(env, repo->get(), argv[1]);
 }
 
+static ERL_NIF_TERM reset_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  auto type = git_reset_t(0);
+
+  if      (enif_is_identical(ATOM_SOFT,  argv[1])) type = GIT_RESET_SOFT;
+  else if (enif_is_identical(ATOM_HARD,  argv[1])) type = GIT_RESET_HARD;
+  else if (enif_is_identical(ATOM_MIXED, argv[1])) type = GIT_RESET_MIXED;
+  else [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string target;
+  if (!term_to_str(env, argv[2], target)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  SmartPtr<git_object> id(git_object_free);
+
+  if (git_revparse_single(&id, repo->get(), target.c_str()) != GIT_OK) [[unlikely]]
+    return make_git_error(env, std::format("Failed to lookup commit {}", target));
+
+  return git_reset(repo->get(), id, type, nullptr) == GIT_OK
+       ? ATOM_OK : make_git_error(env, "Cannot reset");
+}
+
 static void resource_dtor(ErlNifEnv* env, void* arg)
 {
   assert(arg);
@@ -602,6 +631,7 @@ static ErlNifFunc git_funcs[] =
   {"remote_nif",        4, remote_nif},
   {"tag_nif",           4, tag_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"status_nif",        2, status_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"reset_nif",         3, reset_nif},
   {"list_remotes",      1, list_remotes_nif},
 };
 
