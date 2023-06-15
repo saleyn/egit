@@ -44,7 +44,7 @@
 -type add_result()      :: nil |
                            #{mode => dry_run | added, files => [binary()]} |
                            {error, term()}.
--type rev_list_opt()    :: [topo_order | date_order | reverse | 
+-type rev_list_opt()    :: [topo_order | date_order | reverse |
                             {limit, pos_integer()} | {abbrev, pos_integer()}].
 -type rev_list_opts()   :: [rev_list_opt()].
 
@@ -813,10 +813,10 @@ tag_test_() ->
   [
      ?_assertEqual(ok, git:tag_create(R, "v0.0.1", "This is a test\n", [{target, "f791f01"}])),
      ?_assertEqual(ok, git:tag_create(R, "v0.0.2")),
-     ?_assertEqual([], [T || T <- git:list_tags(R), not lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])]),
+     ?_assertEqual([<<"v0.0.1">>, <<"v0.0.2">>], [T || T <- git:list_tags(R), lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])]),
      ?_assertEqual(ok, git:tag_delete(R, "v0.0.1")),
      ?_assertEqual(ok, git:tag_delete(R, "v0.0.2")),
-     ?_assertEqual([], [T || T <- git:list_tags(R), not lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])])
+     ?_assertEqual([], [T || T <- git:list_tags(R), lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])])
   ].
 
 status_test_() ->
