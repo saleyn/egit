@@ -181,17 +181,29 @@ ERL_NIF_TERM lg2_status(ErlNifEnv* env, git_repository* repo, ERL_NIF_TERM opts)
     auto idx = s->head_to_index;
     auto wt  = s->index_to_workdir;
 
+    auto fmt_path = [env](auto& v, auto xstatus, auto delta) {
+      ERL_NIF_TERM val = ATOM_NIL;
+      if (delta->old_file.path && delta->new_file.path) {
+        val = strcmp(delta->old_file.path, delta->new_file.path) == 0
+            ? enif_make_tuple2(env, xstatus, make_binary(env, delta->old_file.path))
+            : enif_make_tuple3(env, xstatus,
+                make_binary(env, delta->old_file.path),
+                make_binary(env, delta->new_file.path));
+      }
+      else if (delta->old_file.path && !delta->new_file.path)
+        val = enif_make_tuple2(env, xstatus, make_binary(env, delta->old_file.path));
+      else if (delta->new_file.path && !delta->old_file.path)
+        val = enif_make_tuple2(env, xstatus, make_binary(env, delta->new_file.path));
+
+      if (val != ATOM_NIL)
+        v.push_back(val);
+    };
+
     if (idx && istatus != ATOM_NIL)
-      index_changes.push_back(
-        enif_make_tuple3(env, istatus,
-          idx->old_file.path ? make_binary(env, idx->old_file.path) : ATOM_NIL,
-          idx->new_file.path ? make_binary(env, idx->new_file.path) : ATOM_NIL));
+      fmt_path(index_changes, istatus, idx);
 
     if (wt && wstatus != ATOM_NIL)
-      wt_changes.push_back(
-        enif_make_tuple3(env, wstatus,
-          wt->old_file.path ? make_binary(env, wt->old_file.path) : ATOM_NIL,
-          wt->new_file.path ? make_binary(env, wt->new_file.path) : ATOM_NIL));
+      fmt_path(wt_changes, wstatus, wt);
 
     if (s->status == GIT_STATUS_WT_NEW && wt->old_file.path)
       untracked.push_back(make_binary(env, wt->old_file.path));

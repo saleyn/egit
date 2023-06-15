@@ -24,6 +24,7 @@ Documentation: https://hexdocs.pm/egit
 - Add files to repository
 - Commit
 - Checkout
+- Get status
 - Cat-file
 - Rev-parse
 - Rev-list
@@ -134,10 +135,10 @@ iex(3)> :git.list_remotes(repo)
 [{"origin", "git@github.com:saleyn/test_repo.git", [:push, :fetch]}]
 iex(4)> ok = File.write!("/tmp/egit_repo/README.md", <<"This is a test\n">>)
 :ok
-iex(5)> :git.add(v(2), "README.md")
+iex(5)> :git.add(repo, "README.md")
 %{mode: :added, files: ["README.md"]}
-iex(6)> :git.list_index(repo)
-[%{path: "README.md"}]
+iex(6)> :git.status(repo)
+[%{index: [{:new, "README.md"}]}]
 iex(7)> :git.commit(repo, "Initial commit")
 {:ok, "dc89c6b26b22f41d34300654f8d36252925d5d67"}
 ```

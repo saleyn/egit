@@ -797,7 +797,9 @@ status_test_() ->
     ?_assertEqual(#{},                              git:status(R, [{untracked, none}])),
     ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R, [{untracked, normal}])),
     ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R, [{untracked, recursive}])),
-    ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R))
+    ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R)),
+    ?_assertEqual(#{mode => added, files => [<<"test.txt">>]}, git:add(R, "test.txt")),
+    ?_assertEqual(#{index => [{new, <<"test.txt">>}]}, git:status(R))
   ].
 
 last_test() ->
