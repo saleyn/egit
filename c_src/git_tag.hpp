@@ -94,8 +94,8 @@ ERL_NIF_TERM lg2_tag(ErlNifEnv* env, git_repository* repo, std::string const& na
     case TagOp::LIST: {
       out = enif_make_list(env, 0);
       GitStrArray tag_names;
-	    if (git_tag_list_match(&tag_names, pattern.c_str(), repo) != GIT_OK) [[unlikely]]
-			  return make_git_error(env, "Unable to get list of tags");
+      if (git_tag_list_match(&tag_names, pattern.c_str(), repo) != GIT_OK) [[unlikely]]
+        return make_git_error(env, "Unable to get list of tags");
 
       std::vector<ERL_NIF_TERM> res;
       res.reserve(tag_names.size());
@@ -111,7 +111,7 @@ ERL_NIF_TERM lg2_tag(ErlNifEnv* env, git_repository* repo, std::string const& na
         switch (git_object_type(obj)) {
           case GIT_OBJECT_TAG: {
             auto tag = obj.template cast<git_tag*>();
-        		auto msg = git_tag_message(tag);
+            auto msg = git_tag_message(tag);
             auto end = end_of_lines(msg, num_lines);
             auto ttt = make_binary(env, git_tag_name(tag));
             res.push_back(
@@ -123,7 +123,7 @@ ERL_NIF_TERM lg2_tag(ErlNifEnv* env, git_repository* repo, std::string const& na
           }
           case GIT_OBJECT_COMMIT: {
             auto cmt = obj.template cast<git_commit*>();
-        		auto msg = git_commit_message(cmt);
+            auto msg = git_commit_message(cmt);
             auto end = end_of_lines(msg, num_lines);
             auto ttt = make_binary(env, tag_name);
             res.push_back(

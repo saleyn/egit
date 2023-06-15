@@ -4,10 +4,10 @@
 
 This project is an Erlang NIF wrapper to `libgit2` library. It allows to
 execute commands to access and manage a `git` repository without depending
-on the external `git` tool.
+on the external `git` tool and internally doesn't involve any parsing of
+text output produced by the `git` executable.
 
-The project is currently in the alpha stage and more functionality is being
-added.
+Though it appears to be stable, the project is currently in the alpha stage and more functionality is being added.
 
 Source code:   https://github.com/saleyn/egit
 
@@ -128,14 +128,14 @@ ok
 ```elixir
 iex(1)> repo = :git.init("/tmp/egit_repo")
 #Reference<0.739271388.2889220102.160795>
-iex(2)> ok = File.write!("/tmp/egit_repo/README.md", <<"This is a test\n">>)
+iex(2)> :git.remote_add(repo, "origin", "git@github.com:saleyn/test_repo.git")
 :ok
-iex(3)> :git.add(v(2), "README.md")
-%{mode: :added, files: ["README.md"]}
-iex(4)> :git.remote_add(repo, "origin", "git@github.com:saleyn/test_repo.git")
-:ok
-iex(5)> :git.list_remotes(repo)
+iex(3)> :git.list_remotes(repo)
 [{"origin", "git@github.com:saleyn/test_repo.git", [:push, :fetch]}]
+iex(4)> ok = File.write!("/tmp/egit_repo/README.md", <<"This is a test\n">>)
+:ok
+iex(5)> :git.add(v(2), "README.md")
+%{mode: :added, files: ["README.md"]}
 iex(6)> :git.list_index(repo)
 [%{path: "README.md"}]
 iex(7)> :git.commit(repo, "Initial commit")
@@ -148,8 +148,8 @@ If you find some functionality lacking, feel free to add missing functions
 and submit a PR.  The implementation recommendation would be to use one of
 the [examples](https://github.com/libgit2/libgit2/tree/main/examples)
 provided with `libgit2` as a guide, add the functionality as `lg2_*()`
-function in `c_src/egit_*.hpp`, modify `egit.cpp` to call that function
-accordingly, write unit tests in `egit.erl` and sumbmit a pull request.
+function in `c_src/git_*.hpp`, modify `git.cpp` to call that function
+accordingly, write unit tests in `git.erl` and sumbmit a pull request.
 
 ## Author
 

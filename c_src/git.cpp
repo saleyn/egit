@@ -22,18 +22,19 @@ namespace std { using namespace fmt; }
 #endif
 
 #include <git2.h>
-#include "egit_utils.hpp"
-#include "egit_add.hpp"
-#include "egit_cat_file.hpp"
-#include "egit_checkout.hpp"
-#include "egit_commit.hpp"
-#include "egit_rev_parse.hpp"
-#include "egit_rev_list.hpp"
-#include "egit_config.hpp"
-#include "egit_branch.hpp"
-#include "egit_index.hpp"
-#include "egit_remote.hpp"
-#include "egit_tag.hpp"
+#include "git_utils.hpp"
+#include "git_add.hpp"
+#include "git_cat_file.hpp"
+#include "git_checkout.hpp"
+#include "git_commit.hpp"
+#include "git_rev_parse.hpp"
+#include "git_rev_list.hpp"
+#include "git_config.hpp"
+#include "git_branch.hpp"
+#include "git_index.hpp"
+#include "git_remote.hpp"
+#include "git_tag.hpp"
+#include "git_status.hpp"
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 {
@@ -344,6 +345,55 @@ static ERL_NIF_TERM commit_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
   return lg2_commit(env, repo->get(), bin_to_str(bin));
 }
 
+static ERL_NIF_TERM push_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  // Parse options
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string sremote = "origin";
+
+  if (!term_to_str(env, argv[1], sremote)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ERL_NIF_TERM ref, list = argv[2];
+
+  if (!enif_is_list(env, list)) [[unlikely]]
+    return raise_badarg_exception(env, list);
+
+  std::vector<std::string> ref_specs;
+
+  while (enif_get_list_cell(env, list, &ref, &list)) {
+    std::string str;
+    if (!term_to_str(env, ref, str)) [[unlikely]]
+      return raise_badarg_exception(env, ref);
+    ref_specs.push_back(str);
+  }
+
+  std::vector<const char*> cref_specs;
+  for (auto& s : ref_specs)
+    cref_specs.push_back(s.c_str());
+
+  git_strarray refspecs = {
+    .strings = const_cast<char**>(&cref_specs.front()),
+    .count   = cref_specs.size()
+  };
+
+  SmartPtr<git_remote> remote(git_remote_free);
+  if (git_remote_lookup(&remote, repo->get(), sremote.c_str()) != GIT_OK) [[unlikely]]
+    return make_git_error(env, "Unable to lookup remote");
+
+  git_push_options options;
+  if (git_push_options_init(&options, GIT_PUSH_OPTIONS_VERSION) != GIT_OK) [[unlikely]]
+    return make_git_error(env, "Error initializing push");
+
+  return git_remote_push(remote, &refspecs, &options) == GIT_OK
+       ? ATOM_OK : make_git_error(env, "Error pushing to " + sremote);
+}
+
 static ERL_NIF_TERM rev_parse_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
   assert(argc == 3);
@@ -478,6 +528,20 @@ static ERL_NIF_TERM tag_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   return lg2_tag(env, repo->get(), bin_to_str(name), op, argv[3]);
 }
 
+static ERL_NIF_TERM status_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[1])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_status(env, repo->get(), argv[1]);
+}
+
 static void resource_dtor(ErlNifEnv* env, void* arg)
 {
   assert(arg);
@@ -514,7 +578,7 @@ static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_N
   return 0;
 }
 
-static ErlNifFunc egit_funcs[] =
+static ErlNifFunc git_funcs[] =
 {
   {"init_nif",          2, init_nif},
   {"clone_nif",         2, clone_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
@@ -523,6 +587,7 @@ static ErlNifFunc egit_funcs[] =
   {"fetch_nif",         3, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"add_nif",           3, add_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"checkout_nif",      3, checkout_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"push_nif",          3, push_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"commit_nif",        2, commit_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"commit_lookup_nif", 3, commit_lookup_nif, 0},
   {"cat_file_nif",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
@@ -536,7 +601,8 @@ static ErlNifFunc egit_funcs[] =
   {"list_index",        2, list_index_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"remote_nif",        4, remote_nif},
   {"tag_nif",           4, tag_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"status_nif",        2, status_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"list_remotes",      1, list_remotes_nif},
 };
 
-ERL_NIF_INIT(git, egit_funcs, load, NULL, upgrade, NULL);
+ERL_NIF_INIT(git, git_funcs, load, NULL, upgrade, NULL);

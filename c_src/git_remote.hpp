@@ -59,7 +59,7 @@ ERL_NIF_TERM lg2_remote(
       return git_remote_delete(repo, name.c_str()) == GIT_OK
            ? ATOM_OK : make_git_error(env, "Could not delete remote");
     case RemoteOp::SETURL:
-		  return (push ? git_remote_set_pushurl(repo, name.c_str(), val.c_str())
+      return (push ? git_remote_set_pushurl(repo, name.c_str(), val.c_str())
                    : git_remote_set_url(repo, name.c_str(), val.c_str())) == GIT_OK
            ? ATOM_OK : make_git_error(env, "Could not set-url");
     case RemoteOp::RENAME: {
@@ -93,14 +93,14 @@ ERL_NIF_TERM lg2_remotes_list(ErlNifEnv* env, git_repository* repo)
   res.reserve(remotes.size()*2);
 
   for (auto i = 0u; i < remotes.size(); i++) {
-		auto name = remotes[i];
+    auto name = remotes[i];
 
     SmartPtr<git_remote> remote(git_remote_free);
-		if (git_remote_lookup(&remote, repo, name) != GIT_OK)
-			return make_git_error(env, std::format("Could not look up remote {}", name));
+    if (git_remote_lookup(&remote, repo, name) != GIT_OK)
+      return make_git_error(env, std::format("Could not look up remote {}", name));
 
-		auto fetch  = git_remote_url(remote);
-		auto push   = git_remote_pushurl(remote);
+    auto fetch  = git_remote_url(remote);
+    auto push   = git_remote_pushurl(remote);
     auto single = fetch && (!push || strcmp(fetch, push) == 0);
 
     ERL_NIF_TERM ll[] = {ATOM_PUSH, ATOM_FETCH};
@@ -118,7 +118,7 @@ ERL_NIF_TERM lg2_remotes_list(ErlNifEnv* env, git_repository* repo)
         : enif_make_list_from_array(env, ll+1, 1);
       res.push_back(enif_make_tuple3(env, make_binary(env, name), make_binary(env, fetch), type));
     }
-	}
+  }
 
   return enif_make_list_from_array(env, &res.front(), res.size());
 }

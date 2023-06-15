@@ -5,7 +5,7 @@
 #include <memory>
 #include <type_traits>
 #include <erl_nif.h>
-#include "egit_atoms.hpp"
+#include "git_atoms.hpp"
 
 #ifdef HAVE_SRCLOC
 #include <source_location>
@@ -148,6 +148,14 @@ inline ERL_NIF_TERM make_binary(ErlNifEnv* env, std::string_view const& str)
   auto [term, p] = make_binary(env, str.length());
   memcpy(p, str.data(), str.length());
   return term;
+}
+
+inline bool term_to_str(ErlNifEnv* env, ERL_NIF_TERM term, std::string& out, bool prohibit_empty = true) {
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, term, &bin) || (prohibit_empty && bin.size == 0))
+    return false;
+  out = std::string((const char*)bin.data, bin.size);
+  return true;
 }
 
 inline std::string bin_to_str(ErlNifBinary const& bin) {
@@ -296,5 +304,12 @@ bool parse_if(ErlNifEnv* env, ERL_NIF_TERM match_term, const ERL_NIF_TERM kv[], 
   int64_t v;
   auto res = enif_is_identical(kv[0], match_term) && enif_get_int64(env, kv[1], &v);
   if (res) val = T(v);
+  return res;
+}
+
+bool parse_atom_if(ErlNifEnv* env, ERL_NIF_TERM match_term, const ERL_NIF_TERM kv[], ERL_NIF_TERM& val)
+{
+  auto res = enif_is_identical(kv[0], match_term) && enif_is_atom(env, kv[1]);
+  if (res) val = kv[1];
   return res;
 }

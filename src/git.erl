@@ -1,6 +1,6 @@
 -module(git).
 -export([init/1, init/2, clone/2, open/1, fetch/1, fetch/2,
-         pull/1, pull/2, commit_lookup/3]).
+         pull/1, pull/2, push/1, push/2, push/3, commit_lookup/3]).
 -export([cat_file/2, cat_file/3, checkout/2, checkout/3]).
 -export([add_all/1, add/2, add/3, commit/2,
          rev_parse/2, rev_parse/3, rev_list/3]).
@@ -11,6 +11,7 @@
 -export([list_remotes/1,  remote_add/3,     remote_rename/3,
          remote_delete/2, remote_set_url/3, remote_set_url/4]).
 -export([tag_create/2, tag_create/3, tag_create/4, tag_delete/2, list_tags/1, list_tags/2]).
+-export([status/1, status/2]).
 
 -on_load(on_load/0).
 
@@ -110,8 +111,31 @@
 
 -type tag_opts() :: [tag_opt()].
 
+-type status_opt() ::
+  {untracked, none|normal|recursive} | {paths, [binary()]} |
+  branch | ignored | submodules | ignore_submodules.
+%% Status function options
+%% <dl>
+%% <dt>{untracked, Untracked}</dt>
+%%  `Untracked' can be one of:
+%%  <dd>
+%%    <du>
+%%    <li>`none' - don't include untracked files</li>
+%%    <li>`normal' - include untracked files</li>
+%%    <li>`recursive' - include untracked files and recurse into untracked directories</li>
+%%    </du>
+%%  </dd>
+%% <dt>{paths, Paths}</dt><dd>`Path' is an array of path patterns to match</dd>
+%% <dt>branch</dt><dd>Include branch name</dd>
+%% <dt>ignored</dt><dd>Include ignored files</dd>
+%% <dt>ignore_submodules</dt><dd>Indicates that submodules should be skipped</dd>
+%% <dt>submodules</dt><dd>Include submodules (overrides `ignore_submodules')</dd>
+%% </dl>
+
+-type status_opts() :: [status_opt()].
+
 -export_type([repository/0, commit_opts/0, cat_file_opt/0, checkout_opts/0, checkout_stats/0]).
--export_type([rev_parse_opts/0, rev_list_opts/0, tag_opts/0]).
+-export_type([rev_parse_opts/0, rev_list_opts/0, tag_opts/0, status_opts/0]).
 -export_type([list_index_opts/0, list_index_entry/0]).
 
 -define(LIBNAME, ?MODULE).
@@ -175,6 +199,20 @@ pull(Repo)          -> fetch_nif(Repo, pull).
 %% @doc Pull from given remote (e.g. `<<"origin">>')
 -spec pull(repository(), binary()|string()) -> ok | {error, binary()}.
 pull(Repo, Remote)  -> fetch_nif(Repo, pull, to_bin(Remote)).
+
+%% @doc Push changes to remote (`"origin"')
+-spec push(repository()) -> ok | {error, binary()}.
+push(Repo)          -> push_nif(Repo, <<"origin">>, []).
+
+%% @doc Push to given remote
+-spec push(repository(), binary()|string()) -> ok | {error, binary()}.
+push(Repo, Remote)  -> push_nif(Repo, to_bin(Remote), []).
+
+%% @doc Push refs to given remote
+-spec push(repository(), binary()|string(), [binary()|string()]) ->
+        ok | {error, binary()}.
+push(Repo, Remote, Refs) when is_list(Refs) ->
+  push_nif(Repo, to_bin(Remote), [to_bin(M) || M <- Refs]).
 
 %% @doc Provide content or type and size information for repository objects.
 -spec cat_file(repository(), binary()|string()) -> {ok, term()} | {error, term()}.
@@ -481,6 +519,16 @@ list_tags(Repo) ->
 list_tags(Repo, Pattern) ->
   tag_nif(Repo, list, <<"">>, [{pattern, to_bin(Pattern)}]).
 
+%% @doc Get repository status
+-spec status(repository()) -> map() | {error, term()}.
+status(Repo) ->
+  status(Repo, []).
+
+%% @doc Get repository status
+-spec status(repository(), status_opts()) -> map() | {error, term()}.
+status(Repo, Opts) ->
+  status_nif(Repo, Opts).
+
 %%-----------------------------------------------------------------------------
 %% Internal functions
 %%-----------------------------------------------------------------------------
@@ -501,6 +549,9 @@ fetch_nif(Repo, _Op) when is_reference(Repo) ->
   ?NOT_LOADED_ERROR.
 
 fetch_nif(Repo, _Op, Remote) when is_reference(Repo), is_binary(Remote) ->
+  ?NOT_LOADED_ERROR.
+
+push_nif(Repo, Remote, Refs) when is_reference(Repo), is_binary(Remote), is_list(Refs) ->
   ?NOT_LOADED_ERROR.
 
 add_nif(Repo, PathSpecs, Opts) when is_reference(Repo), is_list(PathSpecs), is_list(Opts) ->
@@ -542,6 +593,9 @@ branch_nif(Repo, Op, OldName, NewNameOrOpt)
   ?NOT_LOADED_ERROR.
 
 tag_nif(Repo, Op, Tag, Opts) when is_reference(Repo), is_atom(Op), is_binary(Tag), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+status_nif(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
 -ifdef(EUNIT).
@@ -729,6 +783,21 @@ tag_test_() ->
      ?_assertEqual(ok, git:tag_delete(R, "v0.0.1")),
      ?_assertEqual(ok, git:tag_delete(R, "v0.0.2")),
      ?_assertEqual([], [T || T <- git:list_tags(R), not lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])])
+  ].
+
+status_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    ?_assertEqual(#{}, git:status(R)),
+    ?_assertEqual(#{branch => <<"main">>}, git:status(R, [branch])),
+    ?_assertEqual(
+      #{submodules => [{<<"c_src/fmt">>,<<"https://github.com/fmtlib/fmt.git">>}]},
+      git:status(R, [submodules])),
+    ?_assertEqual(ok, file:write_file(<<"/tmp/egit/test.txt">>, <<"Test\n">>)),
+    ?_assertEqual(#{},                              git:status(R, [{untracked, none}])),
+    ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R, [{untracked, normal}])),
+    ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R, [{untracked, recursive}])),
+    ?_assertEqual(#{untracked => [<<"test.txt">>]}, git:status(R))
   ].
 
 last_test() ->
