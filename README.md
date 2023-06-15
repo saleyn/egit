@@ -59,9 +59,9 @@ $ make
 - For Elixir projects add the dependency in `mix.exs`:
 ```elixir
 def deps do
- [
-  egit: "~> 0.1"
- ]
+  [
+    {:egit, "~> 0.1"}
+  ]
 end
 ```
 
