@@ -76,7 +76,7 @@ $(SO_OUTPUT): $(OBJECTS)
 	$(CXX) $(OBJECTS) $(LDFLAGS) -o $(SO_OUTPUT)
 
 %.o: %.cpp $(wildcard *.hpp)
-	@if [ -z $(C20_FEATURES) ]; then \
+	@if [ -z $(findstring $(HAVE_FORMAT),1) ]; then \
 	  echo "==> Updating fmt submodule"; \
 		[ -z "$(shell git config --global safe.directory)" ] && git config --global --add safe.directory '*' || true; \
 		git submodule update --init --recursive; \
