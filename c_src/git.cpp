@@ -13,15 +13,16 @@
 namespace std { using namespace fmt; }
 #endif
 
-#ifndef GIT_OID_SHA1_HEXSIZE
-#define GIT_OID_SHA1_HEXSIZE GIT_OID_HEXSZ
-#endif
-
 #if !defined(GIT_REVSPEC_MERGE_BASE) && defined(GIT_REVPARSE_MERGE_BASE)
 #define GIT_REVSPEC_MERGE_BASE GIT_REVPARSE_MERGE_BASE
 #endif
 
 #include <git2.h>
+
+#ifndef GIT_OID_SHA1_HEXSIZE
+#define GIT_OID_SHA1_HEXSIZE GIT_OID_HEXSZ
+#endif
+
 #include "git_utils.hpp"
 #include "git_add.hpp"
 #include "git_cat_file.hpp"

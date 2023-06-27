@@ -11,6 +11,12 @@
 #include <source_location>
 #endif
 
+#if ERL_NIF_MAJOR_VERSION > 2 || (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 17)
+# define AM_ENCODING ERL_NIF_UTF8
+#else
+# define AM_ENCODING ERL_NIF_LATIN1
+#endif
+
 static ErlNifResourceType* GIT_REPO_RESOURCE;
 
 struct GitRepoPtr {
@@ -187,10 +193,10 @@ inline std::string oid_to_str(git_object const* oid, int abbrev = GIT_OID_SHA1_H
 
 inline std::string atom_to_str(ErlNifEnv* env, ERL_NIF_TERM atom) {
   unsigned int len;
-  if (!enif_get_atom_length(env, atom, &len, ERL_NIF_UTF8))
+  if (!enif_get_atom_length(env, atom, &len, AM_ENCODING))
     return "<bad-atom-len>";
   std::string s(len, '\0');
-  if (!enif_get_atom(env, atom, s.data(), len+1, ERL_NIF_UTF8)) [[unlikely]]
+  if (!enif_get_atom(env, atom, s.data(), len+1, AM_ENCODING)) [[unlikely]]
     return std::format("<bad-atom:{}>", atom);
   return s;
 }
@@ -301,8 +307,8 @@ template <typename T>
 requires std::is_integral<T>::value
 bool parse_if(ErlNifEnv* env, ERL_NIF_TERM match_term, const ERL_NIF_TERM kv[], T& val)
 {
-  int64_t v;
-  auto res = enif_is_identical(kv[0], match_term) && enif_get_int64(env, kv[1], &v);
+  long v;
+  auto res = enif_is_identical(kv[0], match_term) && enif_get_long(env, kv[1], &v);
   if (res) val = T(v);
   return res;
 }
