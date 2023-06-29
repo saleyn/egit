@@ -12,7 +12,6 @@ NIF_DEBUG ?= $(DEBUG)
 NIF_PRINT := $(if $(NIF_PRINT),-DNIF_DEBUG)
 
 CXX       ?= g++
-
 CXX_VSN   ?= $(shell $(CXX) --version | sed -n '1s/^[^0-9]\+\([0-9]\+\)\(.[0-9-]\)\+.*$$/\1/p')
 
 ifeq ($(basename $(CXX)),g++)
@@ -40,11 +39,10 @@ else
   OPTIMIZE = -O0 -g
 endif
 
-CXXFLAGS   ?= -mavx2 -finline-functions -Wall -std=c++20
+CXXFLAGS   ?= -finline-functions -Wall -std=c++20
 
 UNAME_SYS  := $(shell uname -s)
 ifeq ($(UNAME_SYS), Darwin)
-  CXXFLAGS += -pie
   LDFLAGS  ?= -flat_namespace -undefined suppress
 endif
 

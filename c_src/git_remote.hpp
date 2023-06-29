@@ -7,6 +7,7 @@
 
 namespace {
   enum class RemoteOp {
+    UNDEFINED,
     ADD,
     RENAME,
     DELETE,
@@ -21,7 +22,7 @@ ERL_NIF_TERM lg2_remote(
   ERL_NIF_TERM            opt;
   const ERL_NIF_TERM*     tagvals;
   ErlNifBinary            bin;
-  RemoteOp                kind;
+  RemoteOp                kind = RemoteOp::UNDEFINED;
   auto                    push = false;
   std::string             val;
 
@@ -41,12 +42,13 @@ ERL_NIF_TERM lg2_remote(
       while (enif_get_list_cell(env, opts, &opt, &opts)) {
         if (enif_is_identical(opt, ATOM_PUSH)) push = true;
         else [[unlikely]]
-          return raise_badarg_exception(env, opt);
+          goto ERR;
       }
-    }
+    } else [[unlikely]]
+      goto ERR;
   }
   else [[unlikely]]
-    return raise_badarg_exception(env, opt);
+    goto ERR;
 
 
   switch (kind) {
@@ -78,8 +80,10 @@ ERL_NIF_TERM lg2_remote(
       return make_error(env, enif_make_list_from_array(env, &errs.front(), errs.size()));
     }
     default:
-      return raise_badarg_exception(env, op);
+      break;
   }
+ERR:
+  return raise_badarg_exception(env, op);
 }
 
 ERL_NIF_TERM lg2_remotes_list(ErlNifEnv* env, git_repository* repo)

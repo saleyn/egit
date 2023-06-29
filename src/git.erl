@@ -846,7 +846,7 @@ reset_test_() ->
     ?_assertEqual(#{index => [{new, <<"test.txt">>}]}, git:status(R)),
     ?_assertEqual(ok, git:reset(R, hard)),
     ?_assertEqual(#{}, git:status(R)),
-    ?_assertMatch(_, file:delete("/tmp/egit/test.txt"))
+    ?_assert(lists:member(file:delete("/tmp/egit/test.txt"), [ok, {error, enoent}]))
   ].
 
 last_test() ->

@@ -1,4 +1,4 @@
-name: Erlang Build and Test
+name: Erlang CI
 
 on:
   push:
@@ -12,14 +12,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        otp: ["erlang:25", "erlang:26"]
+
     container:
-      image: erlang:26
+      image: ${{ matrix.otp }}
 
     steps:
     - uses: actions/checkout@v2
-      with:
-        # Checkout all history for all branches and tags
-        fetch-depth: 0
     - name: Install latest g++
       run: |
         # ls -l /usr/bin/g++*
