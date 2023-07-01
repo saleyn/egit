@@ -202,14 +202,6 @@ inline std::string atom_to_str(ErlNifEnv* env, ERL_NIF_TERM atom) {
 }
 
 #ifdef HAVE_SRCLOC
-inline const char* basename(const char* path)
-{
-  auto p = path + strlen(path);
-  for (; p > path && *p != '/'; --p);
-  if (*p == '/') ++p;
-  return p;
-}
-
 inline ERL_NIF_TERM src_info(ErlNifEnv* env, const std::source_location& loc)
 {
   char buf[128];

@@ -350,9 +350,9 @@ rev_parse(Repo, Spec) ->
 %% 9> git:rev_list(R, ["HEAD"], [{limit, 4}, {abbrev, 7}]).
 %% [<<"f791f01">>,<<"1b74c46">>,<<"c40374d">>,<<"12968bd">>]
 %% '''
--spec rev_list(repository(), ['not'|'Elixir.Not'|binary()], rev_list_opts()) ->
+-spec rev_list(repository(), ['not'|'Elixir.Not'|string()|binary()]|binary(), rev_list_opts()) ->
         #{commit_opt() => term()}.
-rev_list(Repo, Specs, Opts) when is_list(Specs) ->
+rev_list(Repo, Specs, Opts) when is_list(Specs); is_binary(Specs) ->
   F = fun
     ('not')               -> 'not';
     ('Elixir.Not')        -> 'not';
@@ -360,10 +360,8 @@ rev_list(Repo, Specs, Opts) when is_list(Specs) ->
     (I) when is_binary(I) -> I
   end,
   L = [F(I) || I <-
-        case Specs of
-          _ when is_binary(Specs) -> [Specs];
-          [C|_] when is_integer(C), C >= 40, C < 256 -> [list_to_binary(Specs)];
-          _ when is_list(Specs)   -> Specs
+        if is_binary(Specs) -> [Specs];
+        true                ->  Specs
         end],
   rev_list_nif(Repo, L, Opts).
 

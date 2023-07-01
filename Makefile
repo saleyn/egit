@@ -15,6 +15,9 @@ test:
 run:
 	$(REBAR) shell
 
+check:
+	$(REBAR) dialyzer
+
 docs:
 	$(REBAR) ex_doc
 

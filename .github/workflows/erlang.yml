@@ -33,5 +33,7 @@ jobs:
         apt-get update -y && apt-get install -y libgit2-dev
     - name: Compile
       run:  make
+    - name: Dialyze
+      run:  make check
     - name: Run tests
       run:  make test
