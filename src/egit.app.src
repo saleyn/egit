@@ -1,6 +1,6 @@
 {application,egit,
              [{description,"Native git Erlang inteface library"},
-              {vsn,"0.1.9"},
+              {vsn,"0.1.8"},
               {registered,[]},
               {modules,[git]},
               {env,[]},

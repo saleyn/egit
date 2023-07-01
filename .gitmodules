@@ -1,4 +1,4 @@
 [submodule "c_src/fmt"]
-  path = c_src/fmt
-  url = https://github.com/fmtlib/fmt.git
+	path = c_src/fmt
+	url = https://github.com/fmtlib/fmt.git
   ignore = dirty
