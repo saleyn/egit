@@ -42,7 +42,7 @@ endif
 CXXFLAGS   ?= -finline-functions -Wall -std=c++20
 
 UNAME_SYS  := $(shell uname -s)
-ifeq ($(UNAME_SYS), Darwin)
+ifeq ($(UNAME_SYS),Darwin)
   LDFLAGS  ?= -flat_namespace -undefined suppress
 endif
 
