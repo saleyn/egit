@@ -41,13 +41,13 @@ endif
 
 CXXFLAGS   ?= -finline-functions -Wall -std=c++20
 
-UNAME_SYS  := $(shell uname -s)
-ifeq ($(UNAME_SYS),Darwin)
-  LDFLAGS  ?= -flat_namespace -undefined suppress
-endif
-
 CXXFLAGS   += $(OPTIMIZE) -fPIC $(ERL_CXXFLAGS)
 LDFLAGS    += $(ERL_LDFLAGS) -lei -lgit2 -shared
+
+UNAME_SYS  := $(shell uname -s)
+ifeq ($(UNAME_SYS),Darwin)
+  LDFLAGS  += -flat_namespace -undefined suppress
+endif
 
 SRC_DIR     = $(CURDIR)
 SO_OUTPUT  ?= $(BASEDIR)/priv/$(PROJECT).so
