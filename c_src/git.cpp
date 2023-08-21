@@ -271,7 +271,7 @@ static ERL_NIF_TERM fetch_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
   if (git_remote_fetch(remote,
                        NULL,               // refspecs, NULL to use the configured ones
                        NULL,               // options, empty for defaults
-                       fetch_or_pull) < 0) // reflog mesage, "fetch" (or NULL) or "pull"
+                       fetch_or_pull) < 0) // reflog message, "fetch" (or NULL) or "pull"
     return make_git_error(env, "Failed to fetch from " + remote_name);
 
   return ATOM_OK;
