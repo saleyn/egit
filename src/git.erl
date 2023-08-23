@@ -462,7 +462,7 @@ remote_set_url(Repo, Name, URL) ->
   remote_set_url(Repo, Name, URL, []).
 
 %% @doc Add a remote.
-%% If `Opts' contains `push', then the repository is pushed ot the remote `URL'.
+%% If `Opts' contains `push', then the repository is pushed to the remote `URL'.
 remote_set_url(Repo, Name, URL, Opts) ->
   remote_nif(Repo, {seturl, to_bin(URL)}, to_bin(Name), Opts).
 
