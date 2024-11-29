@@ -7,7 +7,7 @@ execute commands to access and manage a `git` repository without depending
 on the external `git` tool and internally doesn't involve any parsing of
 text output produced by the `git` executable.
 
-Though it appears to be stable, the project is currently in the beta stage and more functionality is being added.
+Though it appears to be stable, the project is currently in the beta stage.
 
 Source code:   https://github.com/saleyn/egit
 
