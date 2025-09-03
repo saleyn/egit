@@ -26,10 +26,13 @@ endif
 
 HAVE_FORMAT ?= $(C20_FEATURES)
 HAVE_SRCLOC ?= $(C20_FEATURES)
+HAVE_FMTLIB := $(shell pkg-config --cflags fmt)
+FMTLIB_ARGS := -DFMT_HEADER_ONLY $(if $(HAVE_FMTLIB),$(HAVE_FMTLIB),-Ifmt/include) -Wno-array-bounds -Wno-stringop-overflow
 
 CPPFLAGS += \
-  $(if $(findstring $(HAVE_FORMAT),1),-DHAVE_FORMAT,-DFMT_HEADER_ONLY -Ifmt/include -Wno-array-bounds -Wno-stringop-overflow) \
-  $(if $(findstring $(HAVE_SRCLOC),1),-DHAVE_SRCLOC)
+  $(if $(findstring $(HAVE_FORMAT),1),-DHAVE_FORMAT,$(FMTLIB_ARGS)) \
+  $(if $(findstring $(HAVE_SRCLOC),1),-DHAVE_SRCLOC) \
+  $(shell pkg-config --cflags libgit2)
 
 # System type and C compiler/flags.
 
@@ -42,7 +45,7 @@ endif
 CXXFLAGS   ?= -finline-functions -Wall -std=c++20
 
 CXXFLAGS   += $(OPTIMIZE) -fPIC $(ERL_CXXFLAGS)
-LDFLAGS    += $(ERL_LDFLAGS) -lei -lgit2 -shared
+LDFLAGS    += $(ERL_LDFLAGS) -lei $(shell pkg-config --libs libgit2) -shared
 
 UNAME_SYS  := $(shell uname -s)
 ifeq ($(UNAME_SYS),Darwin)
@@ -74,7 +77,7 @@ $(SO_OUTPUT): $(OBJECTS)
 	$(CXX) $(OBJECTS) $(LDFLAGS) -o $(SO_OUTPUT)
 
 %.o: %.cpp $(wildcard *.hpp)
-	@if [ -z $(findstring $(HAVE_FORMAT),1) ]; then \
+	@if [ -z $(findstring $(HAVE_FORMAT),1) ] && [ -z "$(HAVE_FMTLIB)"]; then \
 	  echo "==> Updating fmt submodule"; \
 		[ -z "$(shell git config --global safe.directory)" ] && git config --global --add safe.directory '*' || true; \
 		git submodule update --init --recursive; \

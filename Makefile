@@ -9,6 +9,8 @@ all: compile
 compile clean:
 	@$(REBAR) $@
 
+distclean: clean
+	@rm -fr _build
 test:
 	$(REBAR) eunit
 
