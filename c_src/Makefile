@@ -6,12 +6,17 @@ PROJECT		:= $(strip $(PROJECT))
 ERL_CXXFLAGS ?= $(shell erl -noshell -noinput -eval "io:format(\"-I~ts/erts-~ts/include -I~ts\", [code:root_dir(), erlang:system_info(version), code:lib_dir(erl_interface, include)]), halt(0).")
 ERL_LDFLAGS  ?= $(shell erl -noshell -noinput -eval "io:format(\"-L~ts\", [code:lib_dir(erl_interface, lib)]), halt(0).")
 
+ifneq ($(shell which g++),)
+  CXX ?= g++
+else ifneq ($(shell which clang++),)
+  CXX ?= clang++
+else
+  CXX ?= g++
+endif
+
 DEBUG     ?= 0
 NIF_DEBUG ?= $(DEBUG)
-
 NIF_PRINT := $(if $(NIF_PRINT),-DNIF_DEBUG)
-
-CXX       ?= g++
 CXX_VSN   ?= $(shell $(CXX) --version | sed -n '1s/^[^0-9]\+\([0-9]\+\)\(.[0-9-]\)\+.*$$/\1/p')
 
 ifeq ($(basename $(CXX)),g++)
@@ -68,6 +73,7 @@ clean:
 	rm -f $(SO_OUTPUT) *.o
 
 info:
+	@echo CXX=$(CXX)
 	@echo NIF_PRINT=$(NIF_PRINT)
 	@echo NIF_DEBUG=$(NIF_DEBUG)
 	@echo COMPILE_CPP=$(COMPILE_CPP)

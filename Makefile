@@ -11,6 +11,10 @@ compile clean:
 
 distclean: clean
 	@rm -fr _build
+
+info:
+	@make -C c_src $@
+
 test:
 	$(REBAR) eunit
 
