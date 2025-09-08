@@ -41,7 +41,9 @@ Documentation: https://hexdocs.pm/egit
     - On Ubuntu run: `sudo apt-get install libgit2-dev`
     - On Arch Linux run: `sudo pacman -S libgit2`
     - On Mac OS run: `brew install libgit2`
-
+- If you have an older gcc or clang compiler, and prefer to use a globally installed `fmt`
+  library instead of having `egit` pull a `fmt` submodule, install it with:
+    - On Mac OS run: `brew install fmt`
 - If you are building locally from source, clone [egit](https://github.com/saleyn/egit)
 and run:
 ```shell
