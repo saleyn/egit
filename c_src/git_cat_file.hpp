@@ -92,7 +92,7 @@ static ERL_NIF_TERM encode_commit(ErlNifEnv* env, const git_commit* commit, int 
 
   ERL_NIF_TERM map;
 
-  return enif_make_map_from_arrays(env, keys, vals, msg ? 4 : 3, &map) ? map : make_error(env, ATOM_ENOMEM);
+  return enif_make_map_from_arrays(env, keys, vals, msg ? 6 : 5, &map) ? map : make_error(env, ATOM_ENOMEM);
 }
 
 static ERL_NIF_TERM encode_tag(ErlNifEnv* env, const git_tag* tag, int abbrev)

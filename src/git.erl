@@ -718,12 +718,15 @@ cat_file_test_() ->
   R = git:open("/tmp/egit"),
   [
     ?_assertMatch(
-      (#{type    := commit,
-         author  := {User, _, Time, Offset},
-         oid     := OID,
-         parents := [OID1]})
-        when is_binary(User) andalso is_integer(Time) andalso is_integer(Offset)
-             andalso is_binary(OID) andalso is_binary(OID1),
+      (#{type      := commit,
+         author    := {_User, _, Time, Offset},
+         committer := {_CUser, _, _CTime, _COffset},
+         message   := Msg,
+         oid       := OID,
+         parents   := [OID1]})
+        when is_integer(Time) andalso is_integer(Offset)
+             andalso is_binary(OID) andalso is_binary(OID1)
+             andalso is_binary(Msg),
       git:cat_file(R, <<"main">>, [{abbrev, 5}])
     ),
 
@@ -748,7 +751,13 @@ cat_file_test_() ->
       #{type => blob,
         data => <<"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n">>},
       git:cat_file(R, "b893a", [{abbrev, 5}])
-    )
+    ),
+
+    %% root commit has 0 parents — previously crashed via .front() on empty parents vector
+    fun() ->
+      [Root|_] = lists:reverse(git:rev_list(R, ["HEAD"], [])),
+      ?assertMatch(#{type := commit, parents := []}, git:cat_file(R, Root, []))
+    end
   ].
 
 config_test_() ->
