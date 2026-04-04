@@ -264,7 +264,7 @@ static ERL_NIF_TERM fetch_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
     remote_name = bin_to_str(bin);
   }
 
-  git_remote* remote;
+  SmartPtr<git_remote> remote(git_remote_free);
 
   if (git_remote_lookup(&remote, repo->get(), remote_name.c_str()) < 0)
     return make_git_error(env, "Failed to lookup remote " + remote_name);
