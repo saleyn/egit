@@ -639,4 +639,8 @@ static ErlNifFunc git_funcs[] =
   {"list_remotes",      1, list_remotes_nif},
 };
 
-ERL_NIF_INIT(git, git_funcs, load, NULL, upgrade, NULL);
+static void unload(ErlNifEnv* env, void* priv_data) {
+  git_libgit2_shutdown();
+}
+
+ERL_NIF_INIT(git, git_funcs, load, NULL, upgrade, unload);
