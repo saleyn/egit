@@ -35,7 +35,7 @@ static const char* end_of_lines(const char *message, int num_lines)
   if (!msg) [[unlikely]]
     return msg;
 
-  while (*msg && *msg != '\n');         // first line - headline
+  while (*msg && *msg != '\n') msg++;   // first line - headline
   while (*msg && *msg == '\n') msg++;   // skip over new lines
 
   if (num == 0) return msg;             // just headline?
