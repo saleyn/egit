@@ -159,6 +159,6 @@ ERL_NIF_TERM lg2_rev_list(ErlNifEnv* env, git_repository* repo, ERL_NIF_TERM rev
       out.push_back(make_binary(env, buf));
     }
 
-    return enif_make_list_from_array(env, &out.front(), out.size());
+    return make_list(env, out);
   }
 }

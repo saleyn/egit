@@ -259,6 +259,8 @@ ERL_NIF_TERM lg2_status(ErlNifEnv* env, git_repository* repo, ERL_NIF_TERM opts)
   }
 
   ERL_NIF_TERM map;
+  if (keys.empty())
+    return enif_make_new_map(env);
   return enif_make_map_from_arrays(env, &keys.front(), &vals.front(), keys.size(), &map)
        ? map : make_error(env, ATOM_ENOMEM);
 }

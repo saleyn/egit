@@ -311,3 +311,8 @@ bool parse_atom_if(ErlNifEnv* env, ERL_NIF_TERM match_term, const ERL_NIF_TERM k
   if (res) val = kv[1];
   return res;
 }
+
+inline ERL_NIF_TERM make_list(ErlNifEnv* env, std::vector<ERL_NIF_TERM>& v) {
+  return v.empty() ? enif_make_list(env, 0)
+                   : enif_make_list_from_array(env, &v.front(), v.size());
+}

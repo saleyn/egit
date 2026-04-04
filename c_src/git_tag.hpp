@@ -138,7 +138,7 @@ ERL_NIF_TERM lg2_tag(ErlNifEnv* env, git_repository* repo, std::string const& na
             break;
         }
 
-        out = enif_make_list_from_array(env, &res.front(), res.size());
+        out = make_list(env, res);
       }
       break;
     }

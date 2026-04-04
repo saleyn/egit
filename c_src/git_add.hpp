@@ -131,15 +131,15 @@ ERL_NIF_TERM lg2_add(ErlNifEnv* env, git_repository* repo, ERL_NIF_TERM file_spe
 
   // Cleanup memory
   if (err != GIT_OK)
-    return err;
+    return make_git_error(env, "Failed to update index");
 
   if (options.files.size())
     git_index_write(index);
 
-  auto files = enif_make_list_from_array(env, &options.files.front(), options.files.size());
-
   if (options.files.empty())
     return ATOM_NIL;
+
+  auto files = make_list(env, options.files);
 
   auto mode  = options.dry_run ? ATOM_DRY_RUN : ATOM_ADDED;
 

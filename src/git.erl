@@ -847,6 +847,29 @@ reset_test_() ->
     ?_assert(lists:member(file:delete("/tmp/egit/test.txt"), [ok, {error, enoent}]))
   ].
 
+empty_vector_test_() ->
+  %% Test empty vector edge cases that previously caused UB/.front() on empty vectors
+  R = git:open("/tmp/egit"),
+  {ok, OID} = git:rev_parse(R, "HEAD"),
+  [
+    %% commit_lookup with empty fields list — crashed via .front() on empty keys/vals
+    ?_assertEqual(#{}, git:commit_lookup(R, OID, [])),
+
+    %% rev_list with a spec that matches nothing — empty result via make_list helper
+    fun() ->
+      ?assertEqual([], git:rev_list(R, ["HEAD..HEAD"], []))
+    end,
+
+    %% list_branches on a bare repo with no branches
+    fun() ->
+      file:del_dir_r("/tmp/egit_bare"),
+      Bare = git:init("/tmp/egit_bare", [bare]),
+      ?assert(is_reference(Bare)),
+      ?assertEqual([], git:list_branches(Bare)),
+      file:del_dir_r("/tmp/egit_bare")
+    end
+  ].
+
 last_test() ->
   %% Delete the directory if test cases succeeded
   file:del_dir_r("/tmp/egit").

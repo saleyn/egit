@@ -149,6 +149,9 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
       return enif_make_badarg(env);
   }
 
+  if (keys.empty())
+    return enif_make_new_map(env);
+
   ERL_NIF_TERM map;
   if (!enif_make_map_from_arrays(env, &keys.front(), &vals.front(), keys.size(), &map)) [[unlikely]]
     return enif_raise_exception(env, ATOM_ENOMEM);
@@ -379,7 +382,7 @@ static ERL_NIF_TERM push_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
     cref_specs.push_back(s.c_str());
 
   git_strarray refspecs = {
-    .strings = const_cast<char**>(&cref_specs.front()),
+    .strings = cref_specs.empty() ? nullptr : const_cast<char**>(&cref_specs.front()),
     .count   = cref_specs.size()
   };
 
