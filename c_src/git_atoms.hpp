@@ -94,6 +94,7 @@ static ERL_NIF_TERM ATOM_SYSTEM;
 static ERL_NIF_TERM ATOM_TAG;
 static ERL_NIF_TERM ATOM_TAGGER;
 static ERL_NIF_TERM ATOM_TARGET;
+static ERL_NIF_TERM ATOM_TARGET_TYPE;
 static ERL_NIF_TERM ATOM_THEIRS;
 static ERL_NIF_TERM ATOM_TIME_OFFSET;
 static ERL_NIF_TERM ATOM_TIME;
@@ -204,6 +205,7 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_TAG               = enif_make_atom(env, "tag");
   ATOM_TAGGER            = enif_make_atom(env, "tagger");
   ATOM_TARGET            = enif_make_atom(env, "target");
+  ATOM_TARGET_TYPE       = enif_make_atom(env, "target_type");
   ATOM_THEIRS            = enif_make_atom(env, "theirs");
   ATOM_TIME              = enif_make_atom(env, "time");
   ATOM_TIME_OFFSET       = enif_make_atom(env, "time_offset");

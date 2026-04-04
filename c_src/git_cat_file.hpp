@@ -99,7 +99,7 @@ static ERL_NIF_TERM encode_tag(ErlNifEnv* env, const git_tag* tag, int abbrev)
 {
   auto msg = git_tag_message(tag);
 
-  ERL_NIF_TERM keys[] = {ATOM_TYPE, ATOM_OBJECT, ATOM_TYPE, ATOM_TAG, ATOM_TAGGER, ATOM_MESSAGE};
+  ERL_NIF_TERM keys[] = {ATOM_TYPE, ATOM_OBJECT, ATOM_TARGET_TYPE, ATOM_TAG, ATOM_TAGGER, ATOM_MESSAGE};
 
   ERL_NIF_TERM vals[] = {
     ATOM_TAG,
@@ -112,7 +112,7 @@ static ERL_NIF_TERM encode_tag(ErlNifEnv* env, const git_tag* tag, int abbrev)
 
   ERL_NIF_TERM map;
 
-  return enif_make_map_from_arrays(env, keys, vals, msg ? 5 : 4, &map) ? map : make_error(env, ATOM_ENOMEM);
+  return enif_make_map_from_arrays(env, keys, vals, msg ? 6 : 5, &map) ? map : make_error(env, ATOM_ENOMEM);
 }
 
 enum catfile_mode {

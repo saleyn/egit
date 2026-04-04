@@ -820,6 +820,9 @@ tag_test_() ->
   [
      ?_assertEqual(ok, git:tag_create(R, "v0.0.1", "This is a test\n", [{target, "f791f01"}])),
      ?_assertEqual(ok, git:tag_create(R, "v0.0.2")),
+     ?_assertMatch(
+       #{type := tag, target_type := <<"commit">>, object := _, tag := <<"v0.0.1">>, tagger := _, message := _},
+       git:cat_file(R, "v0.0.1", [])),
      ?_assertEqual([<<"v0.0.1">>, <<"v0.0.2">>], [T || T <- git:list_tags(R), lists:member(T, [<<"v0.0.1">>, <<"v0.0.2">>])]),
      ?_assertEqual(ok, git:tag_delete(R, "v0.0.1")),
      ?_assertEqual(ok, git:tag_delete(R, "v0.0.2")),
