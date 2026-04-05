@@ -71,13 +71,13 @@ end
 
 To clone a repository, give it a URL and a local path:
 ```erlang
-1> Repo = git:clone("http://github.com/saleyn/egit.git", "/tmp").
+1> Repo = git:clone("http://github.com/saleyn/egit.git", "/tmp/egit").
 #Ref<...>
 ```
 
 To open a local repository, give it a path:
 ```erlang
-1> Repo = git:open(<<"/tmp/egit">>).
+1> Repo = git:open(~"/tmp/egit").
 #Ref<...>
 ```
 
@@ -95,39 +95,53 @@ functions see the [documentation](https://hexdocs.pm/egit/git.html).
 ### Erlang Example
 
 ```erlang
-2> git:branch_create(R, "tmp", [{target, <<"1b74c46">>}]).
+2> git:branch_create(R, "tmp", [{target, ~"1b74c46"}]).
 ok
 3> git:checkout(R, "tmp").
 ok
-4> file:write_file("/tmp/egit/temp.txt", <<"This is a test">>).
+4> file:write_file("/tmp/egit/temp.txt", ~"This is a test").
 ok
 5> git:add(R, ".").
-#{mode => added,files => [<<"temp.txt">>]}
+#{mode => added,files => [~"temp.txt"]}
 6> git:commit(R, "Add test files").
 ok
-7> git:cat_file(R, <<"tmp">>, [{abbrev, 5}]).
+7> git:cat_file(R, ~"tmp", [{abbrev, 5}]).
 #{type => commit,
   author =>
-      {<<"Serge Aleynikov">>,<<"test@gmail.com">>,1686195121, -14400},
-  oid => <<"b85d0">>,
-  parents => [<<"1fd4b">>]}
+      {~"Serge Aleynikov",~"test@gmail.com",1686195121, -14400},
+  oid => ~"b85d0",
+  parents => [~"1fd4b"]}
 8> git:cat_file(R, "b85d0", [{abbrev, 5}]).
 #{type => tree,
   commits =>
-      [{<<".github">>,<<"tree">>,<<"1e41f">>,16384},
-       {<<".gitignore">>,<<"blob">>,<<"b893a">>,33188},
-       {<<".gitmodules">>,<<"blob">>,<<"2550a">>,33188},
-       {<<".vscode">>,<<"tree">>,<<"c7b1b">>,16384},
-       {<<"LICENSE">>,<<"blob">>,<<"d6456">>,33188},
-       {<<"Makefile">>,<<"blob">>,<<"2d635">>,33188},
-       {<<"README.md">>,<<"blob">>,<<"7b3d0">>,33188},
-       {<<"c_src">>,<<"tree">>,<<"147f3">>,16384},
-       {<<"rebar.config">>,<<"blob">>,<<"1f68a">>,33188},
-       {<<"rebar.lock">>,<<"blob">>,<<"57afc">>,33188},
-       {<<"src">>,<<"tree">>,<<"1bccb">>,16384}]}
+      [{~".github",~"tree",~"1e41f",16384},
+       {~".gitignore",~"blob",~"b893a",33188},
+       {~".gitmodules",~"blob",~"2550a",33188},
+       {~".vscode",~"tree",~"c7b1b",16384},
+       {~"LICENSE",~"blob",~"d6456",33188},
+       {~"Makefile",~"blob",~"2d635",33188},
+       {~"README.md",~"blob",~"7b3d0",33188},
+       {~"c_src",~"tree",~"147f3",16384},
+       {~"rebar.config",~"blob",~"1f68a",33188},
+       {~"rebar.lock",~"blob",~"57afc",33188},
+       {~"src",~"tree",~"1bccb",16384}]}
 8> git:cat_file(R, "b893a", [{abbrev, 5}]).
 #{type => blob,
-  blob => <<"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n">>}
+  data => ~"*.swp\n*.dump\n/c_src/*.o\n/c_src/fmt\n/priv/*.so\n/_build\n/doc\n"}
+9> git:tag_create(R, "v0.1.0", "Release 0.1.0").
+ok
+10> git:list_tags(R).
+[~"v0.1.0"]
+11> git:list_tags(R, [{lines, 1}]).
+[{~"v0.1.0",~"Release 0.1.0\n"}]
+12> git:tag_delete(R, "v0.1.0").
+ok
+13> git:status(R).
+#{untracked => [~"temp.txt"]}
+14> git:status(R, [branch]).
+#{branch => ~"main", untracked => [~"temp.txt"]}
+15> git:reset(R, hard).
+ok
 ```
 
 ### Elixir example
@@ -139,12 +153,12 @@ iex(2)> :git.remote_add(repo, "origin", "git@github.com:saleyn/test_repo.git")
 :ok
 iex(3)> :git.list_remotes(repo)
 [{"origin", "git@github.com:saleyn/test_repo.git", [:push, :fetch]}]
-iex(4)> ok = File.write!("/tmp/egit_repo/README.md", <<"This is a test\n">>)
+iex(4)> ok = File.write!("/tmp/egit_repo/README.md", "This is a test\n")
 :ok
 iex(5)> :git.add(repo, "README.md")
 %{mode: :added, files: ["README.md"]}
 iex(6)> :git.status(repo)
-[%{index: [{:new, "README.md"}]}]
+%{index: [{:new, "README.md"}]}
 iex(7)> :git.commit(repo, "Initial commit")
 {:ok, "dc89c6b26b22f41d34300654f8d36252925d5d67"}
 ```

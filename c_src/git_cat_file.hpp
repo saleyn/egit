@@ -62,7 +62,7 @@ static ERL_NIF_TERM encode_tree(ErlNifEnv* env, const git_tree *tree, int abbrev
   }
 
   ERL_NIF_TERM keys[] = {ATOM_TYPE, ATOM_COMMITS};
-  ERL_NIF_TERM vals[] = {ATOM_TREE, enif_make_list_from_array(env, &v.front(), v.size())};
+  ERL_NIF_TERM vals[] = {ATOM_TREE, make_list(env, v)};
   ERL_NIF_TERM map;
 
   return enif_make_map_from_arrays(env, keys, vals, 2, &map) ? map : make_error(env, ATOM_ENOMEM);
@@ -84,7 +84,7 @@ static ERL_NIF_TERM encode_commit(ErlNifEnv* env, const git_commit* commit, int 
   ERL_NIF_TERM vals[] = {
     ATOM_COMMIT,
     oid_to_bin_term(env, git_commit_tree_id(commit), abbrev),
-    enif_make_list_from_array(env, &v.front(), v.size()),
+    make_list(env, v),
     print_signature(env, git_commit_author(commit)),
     print_signature(env, git_commit_committer(commit)),
     msg ? make_binary(env, msg) : ATOM_NIL
@@ -92,14 +92,14 @@ static ERL_NIF_TERM encode_commit(ErlNifEnv* env, const git_commit* commit, int 
 
   ERL_NIF_TERM map;
 
-  return enif_make_map_from_arrays(env, keys, vals, msg ? 4 : 3, &map) ? map : make_error(env, ATOM_ENOMEM);
+  return enif_make_map_from_arrays(env, keys, vals, msg ? 6 : 5, &map) ? map : make_error(env, ATOM_ENOMEM);
 }
 
 static ERL_NIF_TERM encode_tag(ErlNifEnv* env, const git_tag* tag, int abbrev)
 {
   auto msg = git_tag_message(tag);
 
-  ERL_NIF_TERM keys[] = {ATOM_TYPE, ATOM_OBJECT, ATOM_TYPE, ATOM_TAG, ATOM_TAGGER, ATOM_MESSAGE};
+  ERL_NIF_TERM keys[] = {ATOM_TYPE, ATOM_OBJECT, ATOM_TARGET_TYPE, ATOM_TAG, ATOM_TAGGER, ATOM_MESSAGE};
 
   ERL_NIF_TERM vals[] = {
     ATOM_TAG,
@@ -112,7 +112,7 @@ static ERL_NIF_TERM encode_tag(ErlNifEnv* env, const git_tag* tag, int abbrev)
 
   ERL_NIF_TERM map;
 
-  return enif_make_map_from_arrays(env, keys, vals, msg ? 5 : 4, &map) ? map : make_error(env, ATOM_ENOMEM);
+  return enif_make_map_from_arrays(env, keys, vals, msg ? 6 : 5, &map) ? map : make_error(env, ATOM_ENOMEM);
 }
 
 enum catfile_mode {

@@ -124,5 +124,5 @@ ERL_NIF_TERM lg2_remotes_list(ErlNifEnv* env, git_repository* repo)
     }
   }
 
-  return enif_make_list_from_array(env, &res.front(), res.size());
+  return make_list(env, res);
 }

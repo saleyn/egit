@@ -149,6 +149,9 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
       return enif_make_badarg(env);
   }
 
+  if (keys.empty())
+    return enif_make_new_map(env);
+
   ERL_NIF_TERM map;
   if (!enif_make_map_from_arrays(env, &keys.front(), &vals.front(), keys.size(), &map)) [[unlikely]]
     return enif_raise_exception(env, ATOM_ENOMEM);
@@ -264,7 +267,7 @@ static ERL_NIF_TERM fetch_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
     remote_name = bin_to_str(bin);
   }
 
-  git_remote* remote;
+  SmartPtr<git_remote> remote(git_remote_free);
 
   if (git_remote_lookup(&remote, repo->get(), remote_name.c_str()) < 0)
     return make_git_error(env, "Failed to lookup remote " + remote_name);
@@ -379,7 +382,7 @@ static ERL_NIF_TERM push_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
     cref_specs.push_back(s.c_str());
 
   git_strarray refspecs = {
-    .strings = const_cast<char**>(&cref_specs.front()),
+    .strings = cref_specs.empty() ? nullptr : const_cast<char**>(&cref_specs.front()),
     .count   = cref_specs.size()
   };
 
@@ -636,4 +639,8 @@ static ErlNifFunc git_funcs[] =
   {"list_remotes",      1, list_remotes_nif},
 };
 
-ERL_NIF_INIT(git, git_funcs, load, NULL, upgrade, NULL);
+static void unload(ErlNifEnv* env, void* priv_data) {
+  git_libgit2_shutdown();
+}
+
+ERL_NIF_INIT(git, git_funcs, load, NULL, upgrade, unload);

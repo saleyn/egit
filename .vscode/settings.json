@@ -88,5 +88,8 @@
     "stop_token": "cpp",
     "thread": "cpp",
     "source_location": "cpp"
+  },
+  "chat.tools.terminal.autoApprove": {
+    "make": true
   }
  }

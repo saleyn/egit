@@ -32,10 +32,10 @@ static const char* end_of_lines(const char *message, int num_lines)
   auto msg = message;
   auto num = num_lines - 1;
 
-  if (!msg) [[unlikely]]
-    return msg;
+  if (!msg || num_lines == 0) [[unlikely]]
+    return message;
 
-  while (*msg && *msg != '\n');         // first line - headline
+  while (*msg && *msg != '\n') msg++;   // first line - headline
   while (*msg && *msg == '\n') msg++;   // skip over new lines
 
   if (num == 0) return msg;             // just headline?
@@ -138,7 +138,7 @@ ERL_NIF_TERM lg2_tag(ErlNifEnv* env, git_repository* repo, std::string const& na
             break;
         }
 
-        out = enif_make_list_from_array(env, &res.front(), res.size());
+        out = make_list(env, res);
       }
       break;
     }
