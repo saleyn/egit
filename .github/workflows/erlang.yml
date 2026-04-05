@@ -20,11 +20,13 @@ jobs:
       image: ${{ matrix.otp }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Install latest g++
       run: |
-        ls -l /usr/bin/g++*
-        update-alternatives --install /usr/bin/g++ g++ /usr/bin/gcc-12 100
+        apt-get update -y
+        GCC_VSN=$(apt-cache search '^g\+\+-[0-9]+$' | grep -oP '\d+(?=\s)' | sort -n | tail -1)
+        apt-get install -y g++-${GCC_VSN}
+        update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${GCC_VSN} 100
         g++ --version
         git config --global user.name "Test User"
         git config --global user.email "test@gmail.com"
