@@ -1,4 +1,6 @@
 -module(git).
+-moduledoc "Erlang NIF bindings for libgit2.".
+
 -export([init/1, init/2, clone/2, open/1, fetch/1, fetch/2,
          pull/1, pull/2, push/1, push/2, push/3, commit_lookup/3]).
 -export([cat_file/2, cat_file/3, checkout/2, checkout/3]).
@@ -51,28 +53,25 @@
 -type rev_parse_opt()   :: {abbrev, pos_integer()}.
 -type rev_parse_opts()  :: [rev_parse_opt()].
 
+-doc """
+List branch option.
+- `local` — Return only local branches
+- `remote` — Return only remote branches
+- `all` — Return all branches (default)
+- `fullname` — Return full branch names
+- `{limit, Limit}` — Return up to this number of branches
+""".
 -type list_branch_opt() :: local | remote | all | fullname | {limit,pos_integer()}.
-%% List branch option.
-%% <dl>
-%% <dt>local</dt><dd>Return only local branches</dd>
-%% <dt>remote</dt><dd>Return only remote branches</dd>
-%% <dt>all</dt><dd>Return all branches (default)</dd>
-%% <dt>fullname</dt><dd>Return full branch names</dd>
-%% <dt>{limit, Limit}</dt><dd>Return up to this number of branches</dd>
-%% </dl>
 
 -type list_branch_opts() :: [list_branch_opt()].
 
+-doc """
+List index option.
+- `{abbrev, NumChars}` — NumChars truncates the commit hash (must be less then 40).
+- `{fields, ListOfFields}` — Field list to return. If not specified, the option will default to `[path]`.
+""".
 -type list_index_opt()   :: {abbrev, pos_integer()} |
   {fields, all | [path|stage|conflict|oid|mode|size|ctime|mtime]}.
-%% List index option.
-%% <dl>
-%% <dt>{abbrev, `NumChars'}</dt>
-%%   <dd>NumChars truncates the commit hash (must be less then 40).</dd>
-%% <dt>{fields, `ListOfFields'}</dt>
-%%   <dd>Field list to return. If not specified, the option will default
-%%       to `[path]'.</dd>
-%% </dl>
 
 -type list_index_opts()  :: [list_index_opt()].
 
@@ -83,57 +82,52 @@
   ctime    => pos_integer(), mtime => pos_integer()
 }.
 
+-doc """
+Configuration source.
+If the value is an atom, then:
+- `default` — Find default configuration file for this app
+- `system` — System-wide configuration file - /etc/gitconfig on Linux systems
+- `xdg` — XDG compatible configuration file, typically ~/.config/git/config
+- `global` — User-specific global configuration file, typically ~/.gitconfig
+- `local` — Repository specific configuration file; $WORK_DIR/.git/config on non-bare repos
+- `app` — Application specific configuration file; freely defined by applications
+- `highest` — The most specific config file available for the app
+""".
 -type cfg_source() :: repository() | default | system | xdg | global | local | app | highest.
-%% Configuration source.
-%% If the value is an atom, then:
-%% <dl>
-%% <dt>default</dt><dd>Find default configuration file for this app</dd>
-%% <dt>system</dt><dd>System-wide configuration file - /etc/gitconfig on Linux systems</dd>
-%% <dt>xdg</dt><dd>XDG compatible configuration file, typically ~/.config/git/config</dd>
-%% <dt>global</dt><dd>User-specific global configuration file, typically ~/.gitconfig</dd>
-%% <dt>local</dt><dd>Repository specific configuration file; $WORK_DIR/.git/config on non-bare repos</dd>
-%% <dt>app</dt><dd>Application specific configuration file; freely defined by applications</dd>
-%% <dt>highest</dt><dd>The most specific config file available for the app</dd>
-%% </dl>
 
+-doc """
+Branch creation options
+- `overwrite` — Force to overwrite the existing branch
+- `{target, Commit}` — Use the target commit (default `~"HEAD"`)
+""".
 -type branch_create_opts() :: [overwrite | {target, binary()}].
-%% Branch creation options
-%% <dl>
-%% <dt>overwrite</dt><dd>Force to overwrite the existing branch</dd>
-%% <dt>{target, Commit}</dt><dd>Use the target commit (default `~"HEAD"')</dd>
-%% </dl>
 
+-doc """
+Tag creation options
+- `{message, Msg}` — Message associated with the tag's commit
+- `{pattern, Pat}` — Pattern to search matching tags
+- `{target,  SHA}` — Target commit SHA to be associated with the tag
+- `{lines,   Num}` — Number of lines in the commit to store
+""".
 -type tag_opt() :: [{message, binary()} | {pattern, binary()} | {target, binary()} | {lines, integer()}].
-%% Tag creation options
-%% <dl>
-%% <dt>{message, `Msg'}</dt><dd>Message associated with the tag's commit</dd>
-%% <dt>{pattern, `Pat'}</dt><dd>Pattern to search matching tags</dd>
-%% <dt>{target,  `SHA'}</dt><dd>Target commit SHA to be associated with the tag</dd>
-%% <dt>{lines,   `Num'}</dt><dd>Number of lines in the commit to store</dd>
-%% </dl>
 
 -type tag_opts() :: [tag_opt()].
 
+-doc """
+Status function options
+- `{untracked, Untracked}` — `Untracked` can be one of:
+  - `none` - don't include untracked files
+  - `normal` - include untracked files
+  - `recursive` - include untracked files and recurse into untracked directories
+- `{paths, Paths}` — `Path` is an array of path patterns to match
+- `branch` — Include branch name
+- `ignored` — Include ignored files
+- `ignore_submodules` — Indicates that submodules should be skipped
+- `submodules` — Include submodules (overrides `ignore_submodules`)
+""".
 -type status_opt() ::
   {untracked, none|normal|recursive} | {paths, [binary()]} |
   branch | ignored | submodules | ignore_submodules.
-%% Status function options
-%% <dl>
-%% <dt>{untracked, `Untracked'}</dt>
-%%  `Untracked' can be one of:
-%%  <dd>
-%%    <du>
-%%    <li>`none' - don't include untracked files</li>
-%%    <li>`normal' - include untracked files</li>
-%%    <li>`recursive' - include untracked files and recurse into untracked directories</li>
-%%    </du>
-%%  </dd>
-%% <dt>{paths, `Paths'}</dt><dd>`Path' is an array of path patterns to match</dd>
-%% <dt>branch</dt><dd>Include branch name</dd>
-%% <dt>ignored</dt><dd>Include ignored files</dd>
-%% <dt>ignore_submodules</dt><dd>Indicates that submodules should be skipped</dd>
-%% <dt>submodules</dt><dd>Include submodules (overrides `ignore_submodules')</dd>
-%% </dl>
 
 -type status_opts() :: [status_opt()].
 
