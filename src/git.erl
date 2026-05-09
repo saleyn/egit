@@ -233,7 +233,7 @@ open(Path)          -> open_nif(to_bin(Path)).
 fetch(Repo)         -> fetch_nif(Repo, fetch).
 
 -doc """
-Fetch from given remote (e.g. `~"origin"')
+Fetch from given remote (e.g. origin).
 """.
 -spec fetch(repository(), binary()|string()) -> ok | {error, binary()}.
 fetch(Repo, Remote) -> fetch_nif(Repo, fetch, to_bin(Remote)).
@@ -242,11 +242,13 @@ fetch(Repo, Remote) -> fetch_nif(Repo, fetch, to_bin(Remote)).
 -spec pull(repository()) -> ok | {error, binary()}.
 pull(Repo)          -> fetch_nif(Repo, pull).
 
--doc "Pull from given remote (e.g. `~\"origin\"')".
+-doc """
+Pull from given remote (e.g. origin).
+""".
 -spec pull(repository(), binary()|string()) -> ok | {error, binary()}.
 pull(Repo, Remote)  -> fetch_nif(Repo, pull, to_bin(Remote)).
 
--doc "Push changes to remote (`\"origin\"')".
+-doc "Push changes to remote (origin)".
 -spec push(repository()) -> ok | {error, binary()}.
 push(Repo)          -> push_nif(Repo, <<"origin">>, []).
 
@@ -261,8 +263,8 @@ push(Repo, Remote, Refs) when is_list(Refs) ->
   push_nif(Repo, to_bin(Remote), [to_bin(M) || M <- Refs]).
 
 -doc """
-Same as `cat_file(Repo, Rev, [])'.
-See: `cat_file/3`.
+Same as cat_file(Repo, Rev, []).
+See cat_file/3.
 """.
 -spec cat_file(repository(), binary()|string()) -> map() | {error, term()}.
 cat_file(Repo, Rev) ->
@@ -302,35 +304,36 @@ Example:
 cat_file(Repo, Rev, Opts) ->
   cat_file_nif(Repo, to_bin(Rev), Opts).
 
--doc "Same as `checkout(Repo, Revision, [])'.".
+-doc """
+Same as checkout(Repo, Revision, []).
+""".
 -spec checkout(repository(), binary()|string()) -> ok | {error, term()}.
 checkout(Repo, Rev) -> checkout_nif(Repo, to_bin(Rev), []).
 
 -doc """
 Check out a revision or branch.
-`Opts' is a list of:
-<dl>
-<dt>force</dt><dd>Force the checkout even if there are conflicts</dd>
-<dt>verbose</dt><dd>Return a `checkout_stats()' map instead of `ok'</dd>
-<dt>perf</dt><dd>Include performance counters in the stats map (requires `verbose')</dd>
-</dl>
+
+Opts is a list of:
+
+- force - Force the checkout even if there are conflicts
+- verbose - Return a checkout_stats() map instead of ok
+- perf - Include performance counters in the stats map (requires verbose)
 """.
 -spec checkout(repository(), binary(), checkout_opts()) -> ok | checkout_stats() | {error, term()}.
 checkout(Repo, Revision, Opts) ->
   checkout_nif(Repo, to_bin(Revision), Opts).
 
 -doc """
-Add all pending changes (equivalent to `git add .').
-See: `add/2`.
-See: `add/3`.
+Add all pending changes (equivalent to git add .).
+See add/2 and add/3.
 """.
 -spec add_all(repository()) -> add_result().
 add_all(Repo) when is_reference(Repo) ->
   add_nif(Repo, [<<".">>], []).
 
 -doc """
-Add files matching `PathSpecs' to index
-See: `add/3`.
+Add files matching PathSpecs to index.
+See add/3.
 """.
 -spec add(repository(), binary()|string()|[binary()|string()]) -> add_result().
 add(Repo, [C|_] = PathSpec) when is_integer(C), C >= 32, C < 256 ->
@@ -340,7 +343,9 @@ add(Repo, PathSpecs) when is_list(PathSpecs) ->
 add(Repo, PathSpec) when is_binary(PathSpec) ->
   add_nif(Repo, [PathSpec], []).
 
--doc "Add files matching `PathSpecs' to index with options".
+-doc """
+Add files matching PathSpecs to index with options.
+""".
 -spec add(repository(), [binary()|string()], add_opts()) -> add_result().
 add(Repo, [C|_] = PathSpecs, Opts) when is_integer(C), C >= 32, C < 256 ->
   add_nif(Repo, [to_bin(PathSpecs)], Opts);
@@ -351,8 +356,8 @@ add(Repo, PathSpecs, Opts) when is_list(PathSpecs)->
 
 -doc """
 Commit staged changes to the repository.
-Returns `{ok, OID}' where `OID' is the new commit hash, or
-`{ok, nil}' if there are no staged changes.
+Returns {ok, OID} where OID is the new commit hash, or
+{ok, nil} if there are no staged changes.
 """.
 -spec commit(repository(), binary()|string()) ->
         {ok, OID::binary()|nil} | {error, binary()|atom()}.
@@ -362,21 +367,20 @@ commit(_Repo, Comment) ->
 -doc """
 Reverse parse a reference.
 See [https://git-scm.com/docs/git-rev-parse.html#_specifying_revisions]
-for the formats of a `Spec'.
+for the formats of a Spec.
 
 Opts is a list of:
-<dl>
-<dt>{abbrev, `NumChars'}</dt>
-  <dd>NumChars truncates the commit hash (must be less then 40)</dd>
-</dl>
+
+- {abbrev, NumChars} - NumChars truncates the commit hash (must be less then 40)
 
 When a reference refers to a single object, an ok tuple with a binary
-string of the commit hash is returned.  When it refers to a range
-(e.g. `HEAD..HEAD~2`), a map is returned with `from' and `to' keys.
-When using a Symmetric Difference Notation `...' (i.e. `HEAD...HEAD~4'),
-a map with three keys `from', `to', and `merge_base' is returned.
+string of the commit hash is returned. When it refers to a range
+(e.g. HEAD..HEAD~2), a map is returned with from and to keys.
+When using a Symmetric Difference Notation (i.e. HEAD...HEAD~4),
+a map with three keys from, to, and merge_base is returned.
 
 Examples:
+
 ```
 2> git:rev_parse(R,~"HEAD~4", [{abbrev, 7}]).
 {ok,~"6d6f662"}
@@ -391,7 +395,9 @@ Examples:
 rev_parse(Repo, Spec, Opts) ->
   rev_parse_nif(Repo, to_bin(Spec), Opts).
 
--doc "Same as `rev_parse(Repo, Spec, [])'.".
+-doc """
+Same as rev_parse(Repo, Spec, []).
+""".
 -spec rev_parse(repository(), binary()|string()) ->
         {ok, binary()} | map() | {error, binary()|atom()}.
 rev_parse(Repo, Spec) ->
@@ -433,11 +439,14 @@ rev_list(Repo, Specs, Opts) when is_list(Specs); is_binary(Specs) ->
 
 -doc """
 Lookup commit details identified by OID.
-`Opts' is a list of `commit_opt()' field names to return.
-An empty list returns an empty map.  Pass any of:
-`encoding', `message', `summary', `time', `time_offset',
-`committer', `author', `header', `tree_id'.
+
+Opts is a list of commit_opt() field names to return.
+An empty list returns an empty map. Pass any of:
+encoding, message, summary, time, time_offset,
+committer, author, header, tree_id.
+
 Example:
+
 ```
 1> R = git:open("/tmp/egit").
 2> {ok, OID} = git:rev_parse(R, "HEAD").
@@ -548,7 +557,7 @@ remote_delete(Repo, Name) ->
 
 -doc """
 Change the fetch/push URL for a remote.
-See: `remote_set_url/4`.
+See remote_set_url/4.
 """.
 -spec remote_set_url(repository(), binary()|string(), binary()|string()) ->
         ok | {error, binary()}.
@@ -557,29 +566,29 @@ remote_set_url(Repo, Name, URL) ->
 
 -doc """
 Change the fetch/push URL for a remote.
-If `Opts' contains `push', the URL is set only as the push URL.
+If Opts contains push, the URL is set only as the push URL.
 """.
 remote_set_url(Repo, Name, URL, Opts) ->
   remote_nif(Repo, {seturl, to_bin(URL)}, to_bin(Name), Opts).
 
 -doc """
 List remotes.
-Returns a list of `{Name, URL, [push|fetch]}' triples.
+Returns a list of {Name, URL, [push|fetch]} triples.
 """.
 -spec list_remotes(repository()) -> [{binary(), binary(), [push|fetch]}].
 list_remotes(Repo) when is_reference(Repo) ->
   ?NOT_LOADED_ERROR.
 
 -doc """
-List branches
-See: `list_branches/2`.
+List branches.
+See list_branches/2.
 """.
 list_branches(Repo) ->
   list_branches(Repo, []).
 
 -doc """
-List index
-See: `list_index/2`.
+List index.
+See list_index/2.
 """.
 list_index(Repo) ->
   list_index(Repo, []).
@@ -622,8 +631,8 @@ tag_delete(Repo, Tag) ->
 -doc """
 List all tags in the repository.
 Lightweight tags are returned as plain binaries; annotated tags are also
-returned as plain binaries unless the `{lines, N}' option is used.
-See: `list_tags/2`.
+returned as plain binaries unless the {lines, N} option is used.
+See list_tags/2.
 """.
 -spec list_tags(repository()) ->
         [binary()|{binary(), binary()}] | {error, binary()|atom()}.
@@ -632,17 +641,17 @@ list_tags(Repo) ->
 
 -doc """
 List tags, optionally filtered by pattern or with options.
-When `PatternOrOpts' is a string or binary it is used as a glob pattern
-to filter tag names (e.g. `"v1.*"').
+When PatternOrOpts is a string or binary it is used as a glob pattern
+to filter tag names (e.g. "v1.*").
 When it is a proplist, the following options are recognised:
-<dl>
-<dt>{pattern, `Pat'}</dt><dd>Glob pattern to filter tag names (default `"*"')</dd>
-<dt>{lines, `N'}</dt>
-  <dd>Include up to `N' lines of the tag/commit message.
-      Annotated tags whose message is non-empty are returned as
-      `{Name, Message}' tuples; all others remain plain binaries.</dd>
-</dl>
+
+- {pattern, Pat} - Glob pattern to filter tag names (default "*")
+- {lines, N} - Include up to N lines of the tag/commit message.
+  Annotated tags whose message is non-empty are returned as
+  {Name, Message} tuples; all others remain plain binaries.
+
 Example:
+
 ```
 1> R = git:open("/tmp/egit").
 2> git:list_tags(R, "v0.*").
@@ -670,17 +679,12 @@ status(Repo, Opts) ->
 
 -doc """
 Get repository reset.
-The reset `Type' is one of:
-<dl>
-<dt>soft</dt><dd>The HEAD will be moved to the commit</dd>
-<dt>mixed</dt>
-  <dd>Do a SOFT reset, plus the index will be replaced with the content of
-      the commit tree</dd>
-<dt>hard</dt>
-  <dd>Do a MIXED reset and the working directory will be replaced with the
-      content of the index. Untracked and ignored files will be left alone.
-  </dd>
-</dl>
+
+The reset Type is one of:
+
+- soft - The HEAD will be moved to the commit
+- mixed - Do a SOFT reset, plus the index will be replaced with the content of the commit tree
+- hard - Do a MIXED reset and the working directory will be replaced with the content of the index. Untracked and ignored files will be left alone.
 """.
 -spec reset(repository(), soft|mixed|hard, string()|binary()) -> ok | {error, term()}.
 reset(Repo, Type, Ref) ->
@@ -701,7 +705,7 @@ blame(Repo, Path) ->
 -doc """
 Show file change history by line with options.
 Opts is a list of:
-- `{pattern, Pattern}' - Pattern to match tags
+- {pattern, Pattern} - Pattern to match tags
 """.
 -spec blame(repository(), string()|binary(), list()) -> [{non_neg_integer(), {binary(), binary()}, binary(), integer()}].
 blame(Repo, Path, Opts) when is_reference(Repo), is_list(Opts) ->
@@ -719,7 +723,7 @@ describe(Repo, Rev) ->
 -doc """
 Describe working tree state with options.
 Opts is a list of:
-- `{pattern, Pattern}' - Pattern to match tags
+- {pattern, Pattern} - Pattern to match tags
 """.
 -spec describe(repository(), string()|binary(), list()) -> {ok, binary()} | {error, term()}.
 describe(Repo, Rev, Opts) when is_reference(Repo), is_list(Opts) ->
@@ -727,8 +731,8 @@ describe(Repo, Rev, Opts) when is_reference(Repo), is_list(Opts) ->
 
 -doc """
 Apply a single commit to current branch.
-Returns `ok' on success, `{conflict, Conflicts}' on merge conflict,
-or `{error, Reason}' on failure.
+Returns ok on success, {conflict, Conflicts} on merge conflict,
+or {error, Reason} on failure.
 """.
 -spec cherry_pick(repository(), string()|binary()) -> ok | {conflict, [binary()]} | {error, term()}.
 cherry_pick(Repo, CommitOID) when is_reference(Repo) ->
