@@ -111,6 +111,12 @@ static ERL_NIF_TERM ATOM_UPDATE;
 static ERL_NIF_TERM ATOM_VERBOSE;
 static ERL_NIF_TERM ATOM_WORKTREE;
 static ERL_NIF_TERM ATOM_XDG;
+static ERL_NIF_TERM ATOM_BLAME;
+static ERL_NIF_TERM ATOM_DESCRIBE;
+static ERL_NIF_TERM ATOM_CHERRY_PICK;
+static ERL_NIF_TERM ATOM_REFLOG;
+static ERL_NIF_TERM ATOM_REMOVE;
+static ERL_NIF_TERM ATOM_MOVE;
 
 inline void init_atoms(ErlNifEnv* env)
 {
@@ -225,4 +231,10 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_SOFT              = enif_make_atom(env, "soft");
   ATOM_HARD              = enif_make_atom(env, "hard");
   ATOM_MIXED             = enif_make_atom(env, "mixed");
+  ATOM_BLAME             = enif_make_atom(env, "blame");
+  ATOM_DESCRIBE          = enif_make_atom(env, "describe");
+  ATOM_CHERRY_PICK       = enif_make_atom(env, "cherry_pick");
+  ATOM_REFLOG            = enif_make_atom(env, "reflog");
+  ATOM_REMOVE            = enif_make_atom(env, "remove");
+  ATOM_MOVE              = enif_make_atom(env, "move");
 }

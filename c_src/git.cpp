@@ -36,6 +36,11 @@ namespace std { using namespace fmt; }
 #include "git_remote.hpp"
 #include "git_tag.hpp"
 #include "git_status.hpp"
+#include "git_blame.hpp"
+#include "git_describe.hpp"
+#include "git_cherry_pick.hpp"
+#include "git_reflog.hpp"
+#include "git_remove.hpp"
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 {
@@ -575,6 +580,110 @@ static ERL_NIF_TERM reset_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
        ? ATOM_OK : make_git_error(env, "Cannot reset");
 }
 
+static ERL_NIF_TERM blame_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[2])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string path = bin_to_str(bin);
+  return lg2_blame(env, repo->get(), path, argv[2]);
+}
+
+static ERL_NIF_TERM describe_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[2])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string rev = bin_to_str(bin);
+  return lg2_describe(env, repo->get(), rev, argv[2]);
+}
+
+static ERL_NIF_TERM cherry_pick_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string commit_oid = bin_to_str(bin);
+  return lg2_cherry_pick(env, repo->get(), commit_oid);
+}
+
+static ERL_NIF_TERM reflog_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string refname = bin_to_str(bin);
+  return lg2_reflog(env, repo->get(), refname);
+}
+
+static ERL_NIF_TERM remove_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string path = bin_to_str(bin);
+  return lg2_remove(env, repo->get(), path);
+}
+
+static ERL_NIF_TERM move_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 3);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary old_bin, new_bin;
+  if (!enif_inspect_binary(env, argv[1], &old_bin) || old_bin.size == 0 ||
+      !enif_inspect_binary(env, argv[2], &new_bin) || new_bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string old_path = bin_to_str(old_bin);
+  std::string new_path = bin_to_str(new_bin);
+  return lg2_move(env, repo->get(), old_path, new_path);
+}
+
 static void resource_dtor(ErlNifEnv* env, void* arg)
 {
   assert(arg);
@@ -637,6 +746,12 @@ static ErlNifFunc git_funcs[] =
   {"status_nif",        2, status_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"reset_nif",         3, reset_nif},
   {"list_remotes",      1, list_remotes_nif},
+  {"blame_nif",         3, blame_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"describe_nif",      3, describe_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"cherry_pick_nif",   2, cherry_pick_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"reflog_nif",        2, reflog_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"remove_nif",        2, remove_nif},
+  {"move_nif",          3, move_nif},
 };
 
 static void unload(ErlNifEnv* env, void* priv_data) {

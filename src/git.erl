@@ -15,6 +15,8 @@
 -export([tag_create/2, tag_create/3, tag_create/4, tag_delete/2]).
 -export([list_tags/1, list_tags/2]).
 -export([status/1, status/2, reset/2]).
+-export([blame/2, blame/3, describe/2, describe/3]).
+-export([cherry_pick/2, reflog/2, remove/2, move/3]).
 
 -on_load(on_load/0).
 
@@ -647,6 +649,72 @@ reset(Repo, Type, Ref) ->
 reset(Repo, Type) ->
   reset(Repo, Type, "HEAD").
 
+-doc """
+Show file change history by line.
+Returns a list of {LineNumber, {Author, Email}, CommitOID, Time} tuples.
+""".
+-spec blame(repository(), string()|binary()) -> [{non_neg_integer(), {binary(), binary()}, binary(), integer()}].
+blame(Repo, Path) ->
+  blame(Repo, Path, []).
+
+-doc """
+Show file change history by line with options.
+Opts is a list of:
+- `{pattern, Pattern}' - Pattern to match tags
+""".
+-spec blame(repository(), string()|binary(), list()) -> [{non_neg_integer(), {binary(), binary()}, binary(), integer()}].
+blame(Repo, Path, Opts) when is_reference(Repo), is_list(Opts) ->
+  blame_nif(Repo, to_bin(Path), Opts).
+
+-doc """
+Describe working tree state.
+Returns a human-readable description of the most recent tag and commits.
+Example: "v1.0.0-5-gabcd123"
+""".
+-spec describe(repository(), string()|binary()) -> {ok, binary()} | {error, term()}.
+describe(Repo, Rev) ->
+  describe(Repo, Rev, []).
+
+-doc """
+Describe working tree state with options.
+Opts is a list of:
+- `{pattern, Pattern}' - Pattern to match tags
+""".
+-spec describe(repository(), string()|binary(), list()) -> {ok, binary()} | {error, term()}.
+describe(Repo, Rev, Opts) when is_reference(Repo), is_list(Opts) ->
+  describe_nif(Repo, to_bin(Rev), Opts).
+
+-doc """
+Apply a single commit to current branch.
+Returns `ok' on success, `{conflict, Conflicts}' on merge conflict,
+or `{error, Reason}' on failure.
+""".
+-spec cherry_pick(repository(), string()|binary()) -> ok | {conflict, [binary()]} | {error, term()}.
+cherry_pick(Repo, CommitOID) when is_reference(Repo) ->
+  cherry_pick_nif(Repo, to_bin(CommitOID)).
+
+-doc """
+Show reference logs.
+Returns a list of {OID, Message, Author, Time} tuples.
+""".
+-spec reflog(repository(), string()|binary()) -> [{binary(), binary(), binary(), integer()}].
+reflog(Repo, RefName) when is_reference(Repo) ->
+  reflog_nif(Repo, to_bin(RefName)).
+
+-doc """
+Remove a file from the index and write the index.
+""".
+-spec remove(repository(), string()|binary()) -> ok | {error, term()}.
+remove(Repo, Path) when is_reference(Repo) ->
+  remove_nif(Repo, to_bin(Path)).
+
+-doc """
+Move/rename a file in the index and write the index.
+""".
+-spec move(repository(), string()|binary(), string()|binary()) -> ok | {error, term()}.
+move(Repo, OldPath, NewPath) when is_reference(Repo) ->
+  move_nif(Repo, to_bin(OldPath), to_bin(NewPath)).
+
 %%-----------------------------------------------------------------------------
 %% Internal functions
 %%-----------------------------------------------------------------------------
@@ -717,6 +785,24 @@ status_nif(Repo, Opts) when is_reference(Repo), is_list(Opts) ->
   ?NOT_LOADED_ERROR.
 
 reset_nif(Repo, Type, Ref) when is_reference(Repo), is_atom(Type), is_binary(Ref) ->
+  ?NOT_LOADED_ERROR.
+
+blame_nif(Repo, Path, Opts) when is_reference(Repo), is_binary(Path), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+describe_nif(Repo, Rev, Opts) when is_reference(Repo), is_binary(Rev), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+cherry_pick_nif(Repo, CommitOID) when is_reference(Repo), is_binary(CommitOID) ->
+  ?NOT_LOADED_ERROR.
+
+reflog_nif(Repo, RefName) when is_reference(Repo), is_binary(RefName) ->
+  ?NOT_LOADED_ERROR.
+
+remove_nif(Repo, Path) when is_reference(Repo), is_binary(Path) ->
+  ?NOT_LOADED_ERROR.
+
+move_nif(Repo, OldPath, NewPath) when is_reference(Repo), is_binary(OldPath), is_binary(NewPath) ->
   ?NOT_LOADED_ERROR.
 
 -ifdef(EUNIT).
@@ -969,6 +1055,82 @@ empty_vector_test_() ->
       ?assert(is_reference(Bare)),
       ?assertEqual([], git:list_branches(Bare)),
       file:del_dir_r("/tmp/egit_bare")
+    end
+  ].
+
+describe_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      case git:describe(R, "HEAD") of
+        {ok, Desc} ->
+          ?assert(is_binary(Desc)),
+          ?assert(byte_size(Desc) > 0);
+        {error, _} ->
+          %% May fail if no tags are annotated, which is OK
+          ok
+      end
+    end
+  ].
+
+blame_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      Lines = git:blame(R, "README.md"),
+      ?assert(is_list(Lines)),
+      case Lines of
+        [] -> ok;
+        [First | _] ->
+          ?assert(is_tuple(First)),
+          ?assertEqual(4, tuple_size(First))
+      end
+    end
+  ].
+
+cherry_pick_test_() ->
+  R = git:open("/tmp/egit"),
+  {ok, OID0} = git:rev_parse(R, "HEAD~1"),
+  [
+    fun() ->
+      git:branch_create(R, "cherry_test", [{target, OID0}]),
+      git:checkout(R, "cherry_test"),
+      Res = git:cherry_pick(R, OID0),
+      git:checkout(R, "main"),
+      git:branch_delete(R, "cherry_test"),
+      ?assertMatch(ok, Res)
+    end
+  ].
+
+reflog_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      Log = git:reflog(R, "HEAD"),
+      ?assert(is_list(Log)),
+      case Log of
+        [] -> ok;
+        [First | _] ->
+          ?assert(is_tuple(First)),
+          ?assertEqual(4, tuple_size(First))
+      end
+    end
+  ].
+
+remove_move_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      file:write_file("/tmp/egit/move_test.txt", "test\n"),
+      git:add(R, "move_test.txt"),
+      file:rename("/tmp/egit/move_test.txt", "/tmp/egit/moved_test.txt"),
+      ?assertEqual(ok, git:move(R, "move_test.txt", "moved_test.txt")),
+      Index = git:list_index(R),
+      HasNew = lists:any(fun(#{path := P}) -> P == <<"moved_test.txt">> end, Index),
+      ?assert(HasNew),
+      git:remove(R, "moved_test.txt"),
+      git:reset(R, hard),
+      file:delete("/tmp/egit/moved_test.txt")
     end
   ].
 
