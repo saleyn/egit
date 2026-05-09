@@ -87,7 +87,7 @@ retire-version:
 		echo "$(APP): no stale versions were found on Hex"; \
 	else \
 		echo "Retiring version $(VSN) of $(APP) on Hex..."; \
-		rebar3 hex retire erlalign $(VSN) deprecated --message "Deprecated"; \
+		rebar3 hex retire $(APP) $(VSN) deprecated --message "Deprecated"; \
 	fi
 
 show-versions:
