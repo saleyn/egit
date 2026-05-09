@@ -1,5 +1,5 @@
 REBAR=$(shell which rebar3)
-APP=$(shell sed -n '/application,/{s/^.*, //; s/,.*$$//; p; q}' src/*.app.src)
+APP=$(shell sed -n '/application,/{s/^.*, *\([a-z_]\+\),.*$$/\1/p; q}' src/*.app.src)
 
 ifeq ($(REBAR),)
 	$(error ERROR: rebar3 not found in PATH)
@@ -42,6 +42,7 @@ distclean: clean
 	@rm -fr _build
 
 info:
+	@echo "APP: $(APP)"
 	@make -C c_src $@
 
 test:
