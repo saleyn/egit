@@ -1,6 +1,8 @@
 # egit - Erlang interface to Git
 
 [![build](https://github.com/saleyn/egit/actions/workflows/erlang.yml/badge.svg)](https://github.com/saleyn/egit/actions/workflows/erlang.yml)
+[![Hex.pm](https://img.shields.io/hexpm/v/egit.svg)](https://hex.pm/packages/egit)
+[![Hex.pm](https://img.shields.io/hexpm/dt/egit.svg)](https://hex.pm/packages/egit)
 
 This project is an Erlang NIF wrapper to `libgit2` library. It allows to
 execute commands to access and manage a `git` repository without depending
@@ -15,25 +17,74 @@ Documentation: https://hexdocs.pm/egit
 
 ## Currently supported functionality
 
+### Repository Management
 - Init a repository (including creation of bare repositories)
 - Clone a repository
 - Open a repository at given local path
+
+### Remote Operations
 - Fetch from remote
 - Pull from remote
 - Push to remote
+- List/add/delete/rename/set-url on remotes
+
+### Branch Management
+- List branches (local/remote/all with filters)
+- Create branches
+- Rename branches
+- Delete branches
+
+### File Operations
 - Add files to repository
-- Commit
-- Checkout
-- Get status
-- Cat-file
-- Rev-parse
-- Rev-list
-- Branch list/create/rename/delete
-- Configuration get/set at various levels (e.g. system/global/local/app/default)
+- Remove files from index
+- Move/rename tracked files
+- Checkout revisions/branches
+- Get repository status
 - List files in index
-- List/add/delete/rename/set-url on a remote
+
+### Commit Operations
+- Commit staged changes
+- Look up commit details
+- Reverse parse references
+- List commits with sorting/filtering
+
+### Analysis & History
+- Show file change history by line (`blame`)
+- Describe working tree state (`describe`)
+- Show reference logs (`reflog`)
+
+### Configuration
+- Get/set configuration at various levels (system/global/local/app/default)
+
+### Tagging
 - List/create/delete tags
-- Reset
+
+### Inspection & Manipulation
+- Cat-file (inspect blobs, trees, commits, tags)
+- Reset (soft/mixed/hard)
+- Cherry-pick commits
+
+### Advanced Operations
+- **Diff** - Compare revisions with file-level change tracking
+- **Merge** - Merge branches with fast-forward and conflict detection
+- **Revert** - Create commits that undo changes safely
+- **Rebase** - Interactive rebase with init/next/finish/abort operations
+- **Stash** - Save/list/apply/pop/drop uncommitted changes
+
+## Supported Functions Summary
+
+| Category | Functions |
+|----------|-----------|
+| Repository | init, clone, open |
+| Remote | fetch, pull, push, add, delete, rename, set-url, list |
+| Branch | create, delete, rename, list |
+| File | add, remove, move, checkout, status, list_index |
+| Commit | commit, lookup, rev-parse, rev-list, cherry-pick |
+| Analysis | blame, describe, reflog, diff |
+| Tag | create, delete, list |
+| Configuration | get, set |
+| Advanced | merge, revert, rebase, stash |
+| **Total** | |
 
 ## Installation
 
@@ -41,8 +92,7 @@ Documentation: https://hexdocs.pm/egit
     - On Ubuntu run: `sudo apt-get install libgit2-dev`
     - On Arch Linux run: `sudo pacman -S libgit2`
     - On Mac OS run: `brew install libgit2`
-- If you have an older gcc or clang compiler, and prefer to use a globally installed `fmt`
-  library instead of having `egit` pull a `fmt` submodule, install it with:
+- If you have an older gcc or clang compiler, and prefer to use a globally installed `fmt` library instead of having `egit` pull a `fmt` submodule, install it with:
     - On Mac OS run: `brew install fmt`
 - If you are building locally from source, clone [egit](https://github.com/saleyn/egit)
 and run:
@@ -54,7 +104,7 @@ $ make
 ```erlang
 {deps,
  [% ...
-  {egit, "~> 0.1"}
+  {egit, "~> 0.2"}
  ]}.
 ```
 
@@ -62,7 +112,7 @@ $ make
 ```elixir
 def deps do
   [
-    {:egit, "~> 0.1"}
+    {:egit, "~> 0.2"}
   ]
 end
 ```
@@ -91,6 +141,153 @@ exits.
 After obtaining a repository reference, you can call functions in the
 `git` module as illustrated below. For complete reference of supported
 functions see the [documentation](https://hexdocs.pm/egit/git.html).
+
+### Basic Workflow
+
+Here's a typical workflow for working with repositories:
+
+```erlang
+%% Repository initialization and opening
+1> Repo = git:init("/tmp/my_repo").          % Create new repository
+2> Repo = git:clone(URL, "/tmp/cloned").     % Clone from remote
+3> Repo = git:open("/existing/repo").        % Open existing repository
+
+%% Check repository status
+4> git:status(Repo).
+#{untracked => [<<"file.txt">>]}
+
+%% Make changes
+5> git:add(Repo, "file.txt").
+#{mode => added, files => [<<"file.txt">>]}
+
+%% Commit changes
+6> git:commit(Repo, "Add new file").
+{ok, <<"abc123def456...">>}
+
+%% Push to remote
+7> git:push(Repo).
+ok
+```
+
+### Branch Management
+
+```erlang
+%% Create and work with branches
+1> git:branch_create(Repo, "feature/new-feature").
+ok
+
+2> git:checkout(Repo, "feature/new-feature").
+ok
+
+3> git:list_branches(Repo, [local]).
+[{local, <<"main">>}, {local, <<"feature/new-feature">>}]
+
+%% Rename and delete branches
+4> git:branch_rename(Repo, "feature/new-feature", "feature/better-name").
+ok
+
+5> git:branch_delete(Repo, "feature/old-branch").
+ok
+```
+
+### Advanced Operations
+
+```erlang
+%% Analyze changes with diff
+1> git:diff(Repo, "HEAD~1", "HEAD").
+[{<<"src/module.erl">>, <<"modified">>, 2, 45}]
+
+%% Merge branches
+2> git:merge(Repo, "develop").
+{ok, merged}
+
+%% Safe undo with revert
+3> git:revert(Repo, "abc123def456").
+ok
+
+%% Stash uncommitted work
+4> git:stash_save(Repo, "WIP: feature work").
+{ok, <<"stash_oid">>}
+
+5> git:stash_list(Repo).
+[{0, <<"WIP: feature work">>}]
+
+6> git:stash_apply(Repo, 0).
+ok
+
+%% Rebase for clean history
+7> git:rebase_init(Repo, "main").
+5
+
+8> git:rebase_finish(Repo).
+ok
+```
+
+### Code Analysis
+
+```erlang
+%% Show who made changes
+1> git:blame(Repo, "src/main.erl").
+[{1, {<<"John Doe">>, <<"john@example.com">>}, <<"abc123">>, 1686195121},
+ {2, {<<"Jane Smith">>, <<"jane@example.com">>}, <<"def456">>, 1686195200}]
+
+%% Describe position relative to tags
+2> git:describe(Repo, "HEAD").
+{ok, <<"v1.0.0-5-ga8f5d2c">>}
+
+%% View reference history
+3> git:reflog(Repo, "HEAD").
+[{<<"abc123">>, <<"commit: Initial commit">>, <<"John Doe">>, 1686195121}]
+
+%% Cherry-pick commits
+4> git:cherry_pick(Repo, "feature/other-branch").
+ok
+```
+
+### Tag Management
+
+```erlang
+%% Create and manage tags
+1> git:tag_create(Repo, "v1.0.0", "Release version 1.0.0").
+ok
+
+2> git:list_tags(Repo).
+[<<"v0.9.0">>, <<"v1.0.0">>]
+
+3> git:list_tags(Repo, [{pattern, "v1.*"}]).
+[<<"v1.0.0">>]
+
+%% Get tag details
+4> git:cat_file(Repo, "v1.0.0").
+#{type => tag,
+  target_type => <<"commit">>,
+  object => <<"abc123...">>,
+  tag => <<"v1.0.0">>,
+  tagger => {<<"Jane Smith">>, <<"jane@example.com">>, 1686195200},
+  message => <<"Release version 1.0.0\n">>}
+```
+
+### Remote Management
+
+```erlang
+%% Configure remotes
+1> git:remote_add(Repo, "upstream", "https://github.com/upstream/repo.git").
+ok
+
+2> git:list_remotes(Repo).
+[{<<"origin">>, <<"https://github.com/user/repo.git">>, [push, fetch]},
+ {<<"upstream">>, <<"https://github.com/upstream/repo.git">>, [push, fetch]}]
+
+%% Sync with remote
+3> git:fetch(Repo, "origin").
+ok
+
+4> git:pull(Repo, "origin").
+ok
+
+5> git:push(Repo, "origin", ["main"]).
+ok
+```
 
 ### Erlang Example
 
@@ -141,6 +338,22 @@ ok
 14> git:status(R, [branch]).
 #{branch => ~"main", untracked => [~"temp.txt"]}
 15> git:reset(R, hard).
+ok
+16> git:blame(R, "README.md").
+[{1, {~"Serge Aleynikov", ~"test@gmail.com"}, ~"abc123", 1686195121},
+ {2, {~"Jane Smith", ~"jane@example.com"}, ~"def456", 1686195200}]
+17> git:describe(R, "HEAD").
+{ok, ~"v0.1.0-5-ga8f5d2c"}
+18> git:reflog(R, "HEAD").
+[{~"abc123", ~"commit: Add feature", ~"John Doe", 1686195121},
+ {~"def456", ~"checkout: moving from main to feature", ~"Jane Smith", 1686195200}]
+19> git:cherry_pick(R, ~"abc123def456").
+ok
+20> git:remove(R, "old_file.txt").
+ok
+21> file:rename("/tmp/egit/old.erl", "/tmp/egit/new.erl").
+ok
+22> git:move(R, "old.erl", "new.erl").
 ok
 ```
 

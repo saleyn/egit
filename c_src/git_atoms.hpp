@@ -117,6 +117,16 @@ static ERL_NIF_TERM ATOM_CHERRY_PICK;
 static ERL_NIF_TERM ATOM_REFLOG;
 static ERL_NIF_TERM ATOM_REMOVE;
 static ERL_NIF_TERM ATOM_MOVE;
+static ERL_NIF_TERM ATOM_DIFF;
+static ERL_NIF_TERM ATOM_MERGE;
+static ERL_NIF_TERM ATOM_REVERT;
+static ERL_NIF_TERM ATOM_REBASE;
+static ERL_NIF_TERM ATOM_STASH;
+static ERL_NIF_TERM ATOM_UP_TO_DATE;
+static ERL_NIF_TERM ATOM_FAST_FORWARD;
+static ERL_NIF_TERM ATOM_MERGED;
+static ERL_NIF_TERM ATOM_DONE;
+static ERL_NIF_TERM ATOM_NO_CHANGES;
 
 inline void init_atoms(ErlNifEnv* env)
 {
@@ -237,4 +247,14 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_REFLOG            = enif_make_atom(env, "reflog");
   ATOM_REMOVE            = enif_make_atom(env, "remove");
   ATOM_MOVE              = enif_make_atom(env, "move");
+  ATOM_DIFF              = enif_make_atom(env, "diff");
+  ATOM_MERGE             = enif_make_atom(env, "merge");
+  ATOM_REVERT            = enif_make_atom(env, "revert");
+  ATOM_REBASE            = enif_make_atom(env, "rebase");
+  ATOM_STASH             = enif_make_atom(env, "stash");
+  ATOM_UP_TO_DATE        = enif_make_atom(env, "up_to_date");
+  ATOM_FAST_FORWARD      = enif_make_atom(env, "fast_forward");
+  ATOM_MERGED            = enif_make_atom(env, "merged");
+  ATOM_DONE              = enif_make_atom(env, "done");
+  ATOM_NO_CHANGES        = enif_make_atom(env, "no_changes");
 }

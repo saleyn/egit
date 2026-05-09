@@ -41,6 +41,11 @@ namespace std { using namespace fmt; }
 #include "git_cherry_pick.hpp"
 #include "git_reflog.hpp"
 #include "git_remove.hpp"
+#include "git_diff.hpp"
+#include "git_merge.hpp"
+#include "git_revert.hpp"
+#include "git_rebase.hpp"
+#include "git_stash.hpp"
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 {
@@ -684,6 +689,180 @@ static ERL_NIF_TERM move_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
   return lg2_move(env, repo->get(), old_path, new_path);
 }
 
+static ERL_NIF_TERM diff_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 4);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary from_bin, to_bin;
+  if (!enif_inspect_binary(env, argv[1], &from_bin) || from_bin.size == 0 ||
+      !enif_inspect_binary(env, argv[2], &to_bin) || to_bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  if (!enif_is_list(env, argv[3])) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string from_rev = bin_to_str(from_bin);
+  std::string to_rev = bin_to_str(to_bin);
+  return lg2_diff(env, repo->get(), from_rev, to_rev, argv[3]);
+}
+
+static ERL_NIF_TERM merge_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string branch_oid = bin_to_str(bin);
+  return lg2_merge(env, repo->get(), branch_oid);
+}
+
+static ERL_NIF_TERM revert_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string commit_oid = bin_to_str(bin);
+  return lg2_revert(env, repo->get(), commit_oid);
+}
+
+static ERL_NIF_TERM rebase_init_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string onto_ref = bin_to_str(bin);
+  return lg2_rebase_init(env, repo->get(), onto_ref);
+}
+
+static ERL_NIF_TERM rebase_next_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 1);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_rebase_next(env, repo->get());
+}
+
+static ERL_NIF_TERM rebase_finish_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 1);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_rebase_finish(env, repo->get());
+}
+
+static ERL_NIF_TERM rebase_abort_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 1);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_rebase_abort(env, repo->get());
+}
+
+static ERL_NIF_TERM stash_save_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  ErlNifBinary bin;
+  if (!enif_inspect_binary(env, argv[1], &bin) || bin.size == 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  std::string message = bin_to_str(bin);
+  return lg2_stash_save(env, repo->get(), message);
+}
+
+static ERL_NIF_TERM stash_list_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 1);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_stash_list(env, repo->get());
+}
+
+static ERL_NIF_TERM stash_apply_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  int64_t index;
+  if (!enif_get_int64(env, argv[1], &index) || index < 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_stash_apply(env, repo->get(), (size_t)index);
+}
+
+static ERL_NIF_TERM stash_pop_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  int64_t index;
+  if (!enif_get_int64(env, argv[1], &index) || index < 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_stash_pop(env, repo->get(), (size_t)index);
+}
+
+static ERL_NIF_TERM stash_drop_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+  assert(argc == 2);
+
+  GitRepoPtr* repo;
+  if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
+    return enif_make_badarg(env);
+
+  int64_t index;
+  if (!enif_get_int64(env, argv[1], &index) || index < 0) [[unlikely]]
+    return enif_make_badarg(env);
+
+  return lg2_stash_drop(env, repo->get(), (size_t)index);
+}
+
 static void resource_dtor(ErlNifEnv* env, void* arg)
 {
   assert(arg);
@@ -752,6 +931,18 @@ static ErlNifFunc git_funcs[] =
   {"reflog_nif",        2, reflog_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"remove_nif",        2, remove_nif},
   {"move_nif",          3, move_nif},
+  {"diff_nif",          4, diff_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"merge_nif",         2, merge_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"revert_nif",        2, revert_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"rebase_init_nif",   2, rebase_init_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"rebase_next_nif",   1, rebase_next_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"rebase_finish_nif", 1, rebase_finish_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"rebase_abort_nif",  1, rebase_abort_nif,  ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"stash_save_nif",    2, stash_save_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"stash_list_nif",    1, stash_list_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"stash_apply_nif",   2, stash_apply_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"stash_pop_nif",     2, stash_pop_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"stash_drop_nif",    2, stash_drop_nif},
 };
 
 static void unload(ErlNifEnv* env, void* priv_data) {

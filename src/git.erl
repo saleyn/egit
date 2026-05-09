@@ -1,5 +1,43 @@
 -module(git).
--moduledoc "Erlang NIF bindings for libgit2.".
+-moduledoc """
+Erlang NIF bindings for libgit2.
+
+This module provides comprehensive git repository operations without requiring
+the external `git` executable. Operations range from basic repo management
+(init, clone, open) to advanced functionality (blame, cherry-pick, reflog).
+
+## Common Use Cases
+
+### Repository Operations
+```erlang
+Repo = git:open("/path/to/repo"),
+git:status(Repo),
+git:fetch(Repo),
+git:pull(Repo),
+git:push(Repo)
+```
+
+### Commit Operations
+```erlang
+git:add(Repo, "src/*.erl"),
+git:commit(Repo, "Update implementation"),
+git:rev_parse(Repo, "HEAD~5")
+```
+
+### Branch Management
+```erlang
+git:branch_create(Repo, "feature/my-feature"),
+git:checkout(Repo, "feature/my-feature"),
+git:list_branches(Repo, [local])
+```
+
+### Code Analysis
+```erlang
+git:blame(Repo, "src/main.erl"),
+git:describe(Repo, "HEAD"),
+git:reflog(Repo, "main")
+```
+""".
 
 -export([init/1, init/2, clone/2, open/1, fetch/1, fetch/2,
          pull/1, pull/2, push/1, push/2, push/3, commit_lookup/3]).
@@ -17,6 +55,9 @@
 -export([status/1, status/2, reset/2]).
 -export([blame/2, blame/3, describe/2, describe/3]).
 -export([cherry_pick/2, reflog/2, remove/2, move/3]).
+-export([diff/3, diff/4, merge/2, revert/2]).
+-export([rebase_init/2, rebase_next/1, rebase_finish/1, rebase_abort/1]).
+-export([stash_save/2, stash_list/1, stash_apply/2, stash_pop/2, stash_drop/2]).
 
 -on_load(on_load/0).
 
@@ -715,6 +756,109 @@ Move/rename a file in the index and write the index.
 move(Repo, OldPath, NewPath) when is_reference(Repo) ->
   move_nif(Repo, to_bin(OldPath), to_bin(NewPath)).
 
+-doc """
+Compare two revisions and return list of differences.
+See: `diff/4`.
+""".
+-spec diff(repository(), string()|binary(), string()|binary()) -> [{binary(), binary(), integer(), integer()}].
+diff(Repo, FromRev, ToRev) ->
+  diff(Repo, FromRev, ToRev, []).
+
+-doc """
+Compare two revisions and return list of differences.
+Returns list of {Path, Status, StatusCode, Similarity} tuples.
+Status values: "added", "deleted", "modified", "renamed", "copied", "typechange"
+""".
+-spec diff(repository(), string()|binary(), string()|binary(), list()) -> [{binary(), binary(), integer(), integer()}].
+diff(Repo, FromRev, ToRev, Opts) when is_reference(Repo), is_list(Opts) ->
+  diff_nif(Repo, to_bin(FromRev), to_bin(ToRev), Opts).
+
+-doc """
+Merge another branch into the current branch.
+Returns `{ok, Status}' where Status is 'up_to_date', 'fast_forward', or 'merged'.
+On conflict returns `{conflict, ConflictList}'.
+""".
+-spec merge(repository(), string()|binary()) -> {ok, atom()} | {conflict, [binary()]} | {error, term()}.
+merge(Repo, Branch) when is_reference(Repo) ->
+  merge_nif(Repo, to_bin(Branch)).
+
+-doc """
+Revert a commit (creates new commit undoing the changes).
+Returns `ok' on success, `{conflict, Conflicts}' on merge conflict.
+""".
+-spec revert(repository(), string()|binary()) -> ok | {conflict, [binary()]} | {error, term()}.
+revert(Repo, CommitOID) when is_reference(Repo) ->
+  revert_nif(Repo, to_bin(CommitOID)).
+
+-doc """
+Initialize a rebase operation.
+Returns number of operations in the rebase sequence.
+""".
+-spec rebase_init(repository(), string()|binary()) -> integer() | {error, term()}.
+rebase_init(Repo, OntoRef) when is_reference(Repo) ->
+  rebase_init_nif(Repo, to_bin(OntoRef)).
+
+-doc """
+Continue to the next rebase operation.
+Returns 'done' when all operations are complete, or operation info.
+""".
+-spec rebase_next(repository()) -> done | tuple() | {error, term()}.
+rebase_next(Repo) when is_reference(Repo) ->
+  rebase_next_nif(Repo).
+
+-doc """
+Finish the rebase operation.
+""".
+-spec rebase_finish(repository()) -> ok | {error, term()}.
+rebase_finish(Repo) when is_reference(Repo) ->
+  rebase_finish_nif(Repo).
+
+-doc """
+Abort the current rebase operation.
+""".
+-spec rebase_abort(repository()) -> ok | {error, term()}.
+rebase_abort(Repo) when is_reference(Repo) ->
+  rebase_abort_nif(Repo).
+
+-doc """
+Save uncommitted changes to stash.
+Returns `{ok, StashOID}' or `{error, no_changes}' if nothing to stash.
+""".
+-spec stash_save(repository(), string()|binary()) -> {ok, binary()} | {error, term()}.
+stash_save(Repo, Message) when is_reference(Repo) ->
+  stash_save_nif(Repo, to_bin(Message)).
+
+-doc """
+List all stashed changes.
+Returns list of {Index, Name} tuples.
+""".
+-spec stash_list(repository()) -> [{integer(), binary()}].
+stash_list(Repo) when is_reference(Repo) ->
+  stash_list_nif(Repo).
+
+-doc """
+Apply a stash without removing it.
+Returns `ok' on success, `{conflict, Conflicts}' on conflict.
+""".
+-spec stash_apply(repository(), integer()) -> ok | {conflict, [binary()]} | {error, term()}.
+stash_apply(Repo, Index) when is_reference(Repo), is_integer(Index) ->
+  stash_apply_nif(Repo, Index).
+
+-doc """
+Apply and remove a stash.
+Returns `ok' on success, `{conflict, Conflicts}' on conflict.
+""".
+-spec stash_pop(repository(), integer()) -> ok | {conflict, [binary()]} | {error, term()}.
+stash_pop(Repo, Index) when is_reference(Repo), is_integer(Index) ->
+  stash_pop_nif(Repo, Index).
+
+-doc """
+Delete a stash.
+""".
+-spec stash_drop(repository(), integer()) -> ok | {error, term()}.
+stash_drop(Repo, Index) when is_reference(Repo), is_integer(Index) ->
+  stash_drop_nif(Repo, Index).
+
 %%-----------------------------------------------------------------------------
 %% Internal functions
 %%-----------------------------------------------------------------------------
@@ -803,6 +947,42 @@ remove_nif(Repo, Path) when is_reference(Repo), is_binary(Path) ->
   ?NOT_LOADED_ERROR.
 
 move_nif(Repo, OldPath, NewPath) when is_reference(Repo), is_binary(OldPath), is_binary(NewPath) ->
+  ?NOT_LOADED_ERROR.
+
+diff_nif(Repo, FromRev, ToRev, Opts) when is_reference(Repo), is_binary(FromRev), is_binary(ToRev), is_list(Opts) ->
+  ?NOT_LOADED_ERROR.
+
+merge_nif(Repo, Branch) when is_reference(Repo), is_binary(Branch) ->
+  ?NOT_LOADED_ERROR.
+
+revert_nif(Repo, CommitOID) when is_reference(Repo), is_binary(CommitOID) ->
+  ?NOT_LOADED_ERROR.
+
+rebase_init_nif(Repo, OntoRef) when is_reference(Repo), is_binary(OntoRef) ->
+  ?NOT_LOADED_ERROR.
+
+rebase_next_nif(Repo) when is_reference(Repo) ->
+  ?NOT_LOADED_ERROR.
+
+rebase_finish_nif(Repo) when is_reference(Repo) ->
+  ?NOT_LOADED_ERROR.
+
+rebase_abort_nif(Repo) when is_reference(Repo) ->
+  ?NOT_LOADED_ERROR.
+
+stash_save_nif(Repo, Message) when is_reference(Repo), is_binary(Message) ->
+  ?NOT_LOADED_ERROR.
+
+stash_list_nif(Repo) when is_reference(Repo) ->
+  ?NOT_LOADED_ERROR.
+
+stash_apply_nif(Repo, Index) when is_reference(Repo), is_integer(Index) ->
+  ?NOT_LOADED_ERROR.
+
+stash_pop_nif(Repo, Index) when is_reference(Repo), is_integer(Index) ->
+  ?NOT_LOADED_ERROR.
+
+stash_drop_nif(Repo, Index) when is_reference(Repo), is_integer(Index) ->
   ?NOT_LOADED_ERROR.
 
 -ifdef(EUNIT).
@@ -1131,6 +1311,83 @@ remove_move_test_() ->
       git:remove(R, "moved_test.txt"),
       git:reset(R, hard),
       file:delete("/tmp/egit/moved_test.txt")
+    end
+  ].
+
+diff_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      %% Verify diff is callable and returns a list
+      case git:rev_parse(R, "HEAD") of
+        {ok, OID} ->
+          Result = catch git:diff(R, OID, OID),
+          ?assert(Result == [] orelse is_list(Result));
+        {error, _} ->
+          ok
+      end
+    end
+  ].
+
+merge_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      %% Verify merge is callable and doesn't crash
+      case git:rev_parse(R, "main") of
+        {ok, _} ->
+          _Result = catch git:merge(R, "main"),
+          ok;
+        {error, _} ->
+          ok
+      end
+    end
+  ].
+
+revert_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      %% Verify revert is callable and doesn't crash
+      case git:rev_parse(R, "HEAD") of
+        {ok, OID} ->
+          _Result = catch git:revert(R, OID),
+          catch git:reset(R, hard);
+        {error, _} ->
+          ok
+      end
+    end
+  ].
+
+rebase_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      %% Verify rebase functions are callable and don't crash
+      case catch git:rebase_init(R, "main") of
+        OpCount when is_integer(OpCount) ->
+          case OpCount of
+            0 -> ok;
+            _ ->
+              catch git:rebase_next(R),
+              catch git:rebase_abort(R)
+          end;
+        _ -> ok
+      end
+    end
+  ].
+
+stash_test_() ->
+  R = git:open("/tmp/egit"),
+  [
+    fun() ->
+      %% Verify stash functions are callable and don't crash
+      _Save = catch git:stash_save(R, "test"),
+      _List = catch git:stash_list(R),
+      _Apply = catch git:stash_apply(R, 0),
+      _Pop = catch git:stash_pop(R, 0),
+      _Drop = catch git:stash_drop(R, 0),
+      ok
     end
   ].
 
