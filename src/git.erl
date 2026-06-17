@@ -1274,10 +1274,11 @@ blame_test_() ->
 
 cherry_pick_test_() ->
   R = git:open("/tmp/egit"),
-  {ok, OID0} = git:rev_parse(R, "HEAD~1"),
+  OID0 = find_non_merge_commit(R, "HEAD"),
   [
     fun() ->
-      git:branch_create(R, "cherry_test", [{target, OID0}]),
+      {ok, ParentOID} = git:rev_parse(R, binary_to_list(OID0) ++ "~1"),
+      git:branch_create(R, "cherry_test", [{target, ParentOID}]),
       git:checkout(R, "cherry_test"),
       Res = git:cherry_pick(R, OID0),
       git:checkout(R, "main"),
@@ -1285,6 +1286,17 @@ cherry_pick_test_() ->
       ?assertMatch(ok, Res)
     end
   ].
+
+%% Walk back from Rev until a commit with exactly one parent is found,
+%% since cherry-picking a merge commit requires a mainline option that
+%% cherry_pick/2 does not support.
+find_non_merge_commit(R, Rev) ->
+  {ok, OID} = git:rev_parse(R, Rev),
+  #{parents := Parents} = git:cat_file(R, OID, []),
+  case Parents of
+    [_] -> OID;
+    _   -> find_non_merge_commit(R, binary_to_list(OID) ++ "~1")
+  end.
 
 reflog_test_() ->
   R = git:open("/tmp/egit"),
