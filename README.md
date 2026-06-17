@@ -1,10 +1,10 @@
-# egit - Erlang interface to Git
+![Banner](https://github.com/saleyn/egit/blob/main/assets/egit-banner.png?raw=true)
 
 [![build](https://github.com/saleyn/egit/actions/workflows/erlang.yml/badge.svg)](https://github.com/saleyn/egit/actions/workflows/erlang.yml)
 [![Hex.pm](https://img.shields.io/hexpm/v/egit.svg)](https://hex.pm/packages/egit)
 [![Hex.pm](https://img.shields.io/hexpm/dt/egit.svg)](https://hex.pm/packages/egit)
 
-This project is an Erlang NIF wrapper to `libgit2` library. It allows to
+`egit` project is an Erlang NIF wrapper to `libgit2` library. It allows to
 execute commands to access and manage a `git` repository without depending
 on the external `git` tool and internally doesn't involve any parsing of
 text output produced by the `git` executable.
