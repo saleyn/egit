@@ -826,7 +826,7 @@ static ERL_NIF_TERM stash_apply_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
   if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
     return enif_make_badarg(env);
 
-  int64_t index;
+  ErlNifSInt64 index;
   if (!enif_get_int64(env, argv[1], &index) || index < 0) [[unlikely]]
     return enif_make_badarg(env);
 
@@ -841,7 +841,7 @@ static ERL_NIF_TERM stash_pop_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
   if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
     return enif_make_badarg(env);
 
-  int64_t index;
+  ErlNifSInt64 index;
   if (!enif_get_int64(env, argv[1], &index) || index < 0) [[unlikely]]
     return enif_make_badarg(env);
 
@@ -856,7 +856,7 @@ static ERL_NIF_TERM stash_drop_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM 
   if (!enif_get_resource(env, argv[0], GIT_REPO_RESOURCE, (void**)&repo)) [[unlikely]]
     return enif_make_badarg(env);
 
-  int64_t index;
+  ErlNifSInt64 index;
   if (!enif_get_int64(env, argv[1], &index) || index < 0) [[unlikely]]
     return enif_make_badarg(env);
 
