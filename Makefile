@@ -70,15 +70,12 @@ bump-version:
 	echo "Bumping version from $${CURRENT} to $${NEW}"; \
 	sed -i "s/{vsn, \"$${CURRENT}\"}/{vsn, \"$${NEW}\"}/" $$FILE; \
 	echo "Changed: {vsn, \"$${CURRENT}\"} -> {vsn, \"$${NEW}\"}"; \
+	sed -i 's/\({:\?glazer,[[:space:]]*"~>\)[^"]*/\1 '"$${MAJOR}.$${MINOR}"'/' README.md; \
 	echo ""; \
 	read -p "Commit this change? [Y/n] " -n 1 -r || true; \
 	echo ""; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]] || [[ -z $$REPLY ]]; then \
-		git commit -am "Bump version to $${NEW}"; \
-	else \
-		echo "Aborted. Reverting rebar.config..."; \
-		git checkout rebar.config; \
-		exit 1; \
+	  git commit -am "Bump version to $${NEW}"; \
 	fi
 
 retire-version: VSN=$(if $(version),$(version),$(shell mix hex.info $(APP) | grep "^Releases:" | sed 's/Releases: //; s/, /\n/g' | sed '/retired/d; /\.\.\./d' | sed -n '$$p'))
