@@ -46,6 +46,7 @@ namespace std { using namespace fmt; }
 #include "git_revert.hpp"
 #include "git_rebase.hpp"
 #include "git_stash.hpp"
+#include "git_credentials.hpp"
 
 static ERL_NIF_TERM to_monitored_resource(ErlNifEnv* env, git_repository* p)
 {
@@ -172,7 +173,7 @@ commit_lookup_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 static ERL_NIF_TERM clone_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
   ErlNifBinary url, path;
-  assert(argc == 2);
+  assert(argc >= 2 && argc <= 3);
 
   if (!enif_inspect_binary(env, argv[0], &url) ||
       !enif_inspect_binary(env, argv[1], &path)) [[unlikely]]
@@ -182,8 +183,24 @@ static ERL_NIF_TERM clone_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
   std::string spath = bin_to_str(path);
 
   git_repository* p{};
+  git_clone_options clone_opts = GIT_CLONE_OPTIONS_INIT;
 
-  if (git_clone(&p, surl.c_str(), spath.c_str(), nullptr) < 0) [[unlikely]]
+  // Parse credentials from options if provided
+  ERL_NIF_TERM credentials = 0;
+  if (argc == 3) {
+    credentials = extract_credentials_from_options(env, argv[2]);
+    if (credentials && !parse_credentials_param(env, credentials)) [[unlikely]]
+      return enif_make_badarg(env);
+  }
+
+  // Always install the credential callback - even with no credentials
+  // supplied - so libgit2 falls back to ssh-agent/default credentials
+  // (like the `git` CLI does) instead of refusing outright. This matters
+  // for public https:// URLs too: local git config can rewrite them to an
+  // SSH URL via `url.insteadOf`, which then requires *some* callback.
+  set_clone_credentials_callback(env, &clone_opts, credentials);
+
+  if (git_clone(&p, surl.c_str(), spath.c_str(), &clone_opts) < 0) [[unlikely]]
     return raise_git_exception(env, "Failed to clone git repo " + surl);
 
   #ifdef NIF_DEBUG
@@ -268,23 +285,51 @@ static ERL_NIF_TERM fetch_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
     return enif_make_badarg(env);
 
   std::string remote_name("origin");
+  ERL_NIF_TERM credentials = 0;
 
+  // Parse optional remote name and/or options, in the shapes the Erlang
+  // wrappers may pass:
+  //   argc == 2                          -> defaults only
+  //   argc == 3, argv[2] is a map        -> options for the default remote
+  //   argc == 3, argv[2] is a binary     -> remote name, no options
+  //   argc == 4                         -> remote name (argv[2]) + options (argv[3])
   if (argc > 2) {
-    ErlNifBinary bin;
-    if (!enif_inspect_binary(env, argv[2], &bin)) [[unlikely]]
-      return enif_make_badarg(env);
+    if (enif_is_map(env, argv[2])) {
+      if (argc > 3) [[unlikely]]
+        return enif_make_badarg(env);
+      credentials = extract_credentials_from_options(env, argv[2]);
+    } else {
+      ErlNifBinary bin;
+      if (!enif_inspect_binary(env, argv[2], &bin)) [[unlikely]]
+        return enif_make_badarg(env);
+      remote_name = bin_to_str(bin);
 
-    remote_name = bin_to_str(bin);
+      if (argc > 3) {
+        if (!enif_is_map(env, argv[3])) [[unlikely]]
+          return enif_make_badarg(env);
+        credentials = extract_credentials_from_options(env, argv[3]);
+      }
+    }
   }
+
+  if (credentials && !parse_credentials_param(env, credentials)) [[unlikely]]
+    return enif_make_badarg(env);
 
   SmartPtr<git_remote> remote(git_remote_free);
 
   if (git_remote_lookup(&remote, repo->get(), remote_name.c_str()) < 0)
     return make_git_error(env, "Failed to lookup remote " + remote_name);
+
+  // Always install the credential callback (see clone_nif for why) so
+  // fetch/pull fall back to ssh-agent/default credentials instead of
+  // refusing outright when no explicit credentials are supplied.
+  git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
+  set_fetch_credentials_callback(env, &fetch_opts, credentials);
+
   if (git_remote_fetch(remote,
-                       NULL,               // refspecs, NULL to use the configured ones
-                       NULL,               // options, empty for defaults
-                       fetch_or_pull) < 0) // reflog message, "fetch" (or NULL) or "pull"
+                       NULL,              // refspecs, NULL to use the configured ones
+                       &fetch_opts,       // options
+                       fetch_or_pull) < 0) // reflog message
     return make_git_error(env, "Failed to fetch from " + remote_name);
 
   return ATOM_OK;
@@ -361,7 +406,7 @@ static ERL_NIF_TERM commit_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
 
 static ERL_NIF_TERM push_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-  assert(argc == 3);
+  assert(argc >= 3 && argc <= 4);
 
   // Parse options
   GitRepoPtr* repo;
@@ -387,6 +432,15 @@ static ERL_NIF_TERM push_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
     ref_specs.push_back(str);
   }
 
+  // Parse credentials from options if provided
+  ERL_NIF_TERM credentials = 0;
+  if (argc == 4) {
+    credentials = extract_credentials_from_options(env, argv[3]);
+  }
+
+  if (credentials && !parse_credentials_param(env, credentials)) [[unlikely]]
+    return enif_make_badarg(env);
+
   std::vector<const char*> cref_specs;
   for (auto& s : ref_specs)
     cref_specs.push_back(s.c_str());
@@ -400,11 +454,16 @@ static ERL_NIF_TERM push_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
   if (git_remote_lookup(&remote, repo->get(), sremote.c_str()) != GIT_OK) [[unlikely]]
     return make_git_error(env, "Unable to lookup remote");
 
-  git_push_options options;
-  if (git_push_options_init(&options, GIT_PUSH_OPTIONS_VERSION) != GIT_OK) [[unlikely]]
+  git_push_options push_opts;
+  if (git_push_options_init(&push_opts, GIT_PUSH_OPTIONS_VERSION) != GIT_OK) [[unlikely]]
     return make_git_error(env, "Error initializing push");
 
-  return git_remote_push(remote, &refspecs, &options) == GIT_OK
+  // Always install the credential callback (see clone_nif for why) so
+  // push falls back to ssh-agent/default credentials instead of refusing
+  // outright when no explicit credentials are supplied.
+  set_push_credentials_callback(env, &push_opts, credentials);
+
+  return git_remote_push(remote, &refspecs, &push_opts) == GIT_OK
        ? ATOM_OK : make_git_error(env, "Error pushing to " + sremote);
 }
 
@@ -901,48 +960,114 @@ static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_N
 
 static ErlNifFunc git_funcs[] =
 {
-  {"init_nif",          2, init_nif},
+  // Repository initialization - filesystem I/O to create .git structure
+  {"init_nif",          2, init_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Repository cloning - network and filesystem I/O
   {"clone_nif",         2, clone_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"clone_nif",         3, clone_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Repository opening - filesystem I/O
   {"open_nif",          1, open_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Fetch operations - network I/O
   {"fetch_nif",         2, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"fetch_nif",         3, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"fetch_nif",         4, fetch_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Index operations - filesystem I/O
   {"add_nif",           3, add_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Checkout operations - filesystem I/O to update working tree
   {"checkout_nif",      3, checkout_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Push operations - network I/O
   {"push_nif",          3, push_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"push_nif",          4, push_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Commit operations - filesystem I/O to write objects
   {"commit_nif",        2, commit_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"commit_lookup_nif", 3, commit_lookup_nif, 0},
+
+  // Commit lookup - reads object database from filesystem
+  {"commit_lookup_nif", 3, commit_lookup_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Cat file operations - filesystem I/O to read git objects
   {"cat_file_nif",      3, cat_file_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Revision parsing - filesystem I/O to resolve references
   {"rev_parse_nif",     3, rev_parse_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Revision listing - filesystem I/O to enumerate commits
   {"rev_list_nif",      3, rev_list_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"config_get_nif",    2, config_nif},
-  {"config_set_nif",    3, config_nif},
-  {"branch_nif",        3, branch_nif},
-  {"branch_nif",        4, branch_nif},
+
+  // Configuration operations - filesystem I/O to read/write config files
+  {"config_get_nif",    2, config_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"config_set_nif",    3, config_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Branch operations - filesystem I/O to manage branches
+  {"branch_nif",        3, branch_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+  {"branch_nif",        4, branch_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // List branches - filesystem I/O
   {"list_branches",     2, list_branches_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // List index - filesystem I/O to read index file
   {"list_index",        2, list_index_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"remote_nif",        4, remote_nif},
+
+  // Remote operations - filesystem I/O to manage remote configurations
+  {"remote_nif",        4, remote_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Tag operations - filesystem I/O
   {"tag_nif",           4, tag_nif,           ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Status operations - filesystem I/O to check working tree state
   {"status_nif",        2, status_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"reset_nif",         3, reset_nif},
-  {"list_remotes",      1, list_remotes_nif},
+
+  // Reset operations - filesystem I/O to reset working tree and index
+  {"reset_nif",         3, reset_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // List remotes - filesystem I/O
+  {"list_remotes",      1, list_remotes_nif,  ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Blame operations - filesystem I/O to compute blame history
   {"blame_nif",         3, blame_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Describe operations - filesystem I/O
   {"describe_nif",      3, describe_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Cherry-pick operations - filesystem I/O
   {"cherry_pick_nif",   2, cherry_pick_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Reflog operations - filesystem I/O to read reflog
   {"reflog_nif",        2, reflog_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"remove_nif",        2, remove_nif},
-  {"move_nif",          3, move_nif},
+
+  // Remove from index - filesystem I/O
+  {"remove_nif",        2, remove_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Move/rename in index - filesystem I/O
+  {"move_nif",          3, move_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Diff operations - filesystem I/O to compute differences
   {"diff_nif",          4, diff_nif,          ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Merge operations - filesystem I/O
   {"merge_nif",         2, merge_nif,         ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Revert operations - filesystem I/O
   {"revert_nif",        2, revert_nif,        ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Rebase operations - filesystem I/O
   {"rebase_init_nif",   2, rebase_init_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"rebase_next_nif",   1, rebase_next_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"rebase_finish_nif", 1, rebase_finish_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"rebase_abort_nif",  1, rebase_abort_nif,  ERL_NIF_DIRTY_JOB_IO_BOUND},
+
+  // Stash operations - filesystem I/O
   {"stash_save_nif",    2, stash_save_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"stash_list_nif",    1, stash_list_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"stash_apply_nif",   2, stash_apply_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
   {"stash_pop_nif",     2, stash_pop_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
-  {"stash_drop_nif",    2, stash_drop_nif},
+  {"stash_drop_nif",    2, stash_drop_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
 };
 
 static void unload(ErlNifEnv* env, void* priv_data) {

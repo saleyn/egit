@@ -267,6 +267,146 @@ ok
   message => <<"Release version 1.0.0\n">>}
 ```
 
+### Authentication
+
+egit supports multiple authentication methods for accessing private
+repositories. For detailed documentation see [credentials](CREDENTIALS.md)
+
+#### SSH Key Authentication
+
+Use SSH keys for authentication (from memory or files):
+
+```erlang
+%% SSH key from file paths
+Creds = #{
+  type => ssh_key,
+  username => <<"git">>,
+  privkey => <<"/home/user/.ssh/id_rsa">>,
+  pubkey => <<"/home/user/.ssh/id_rsa.pub">>,
+  passphrase => <<"optional_passphrase">>
+},
+
+%% Clone private repository
+Repo = git:clone(
+  <<"git@github.com:user/private-repo.git">>,
+  <<"/tmp/private-repo">>,
+  #{credentials => Creds}
+).
+
+%% Fetch with SSH key authentication
+git:fetch(Repo, <<"origin">>, #{credentials => Creds}).
+
+%% Push with SSH key authentication
+git:push(Repo, <<"origin">>, [<<"refs/heads/main">>], #{credentials => Creds}).
+```
+
+#### SSH Key from Memory
+
+For key material in memory (e.g., from configuration):
+
+```erlang
+%% PEM-encoded key content directly
+PrivKeyPEM = <<"-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----">>,
+PublicKeyPEM = <<"ssh-rsa AAAAB3Nza...\n">>,
+
+Creds = #{
+  type => ssh_key,
+  username => <<"git">>,
+  privkey => PrivKeyPEM,
+  pubkey => PublicKeyPEM
+},
+
+Repo = git:clone(Url, Path, #{credentials => Creds}).
+```
+
+#### Username/Password Authentication
+
+For HTTP(S) repositories with basic authentication:
+
+```erlang
+Creds = #{
+  type => userpass,
+  username => <<"github_user">>,
+  password => <<"password_or_token">>
+},
+
+Repo = git:clone(
+  <<"https://github.com/user/private-repo.git">>,
+  <<"/tmp/private-repo">>,
+  #{credentials => Creds}
+).
+```
+
+#### Personal Access Token (GitHub, GitLab, etc.)
+
+Use a PAT for token-based authentication:
+
+```erlang
+%% GitHub Personal Access Token
+TokenCreds = #{
+  type => token,
+  username => <<"your_username">>,  % Can also be 'oauth2' or 'git'
+  token => <<"ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">>
+},
+
+Repo = git:clone(
+  <<"https://github.com/user/private-repo.git">>,
+  <<"/tmp/private-repo">>,
+  #{credentials => TokenCreds}
+).
+
+%% Fetch with token authentication
+git:fetch(Repo, <<"origin">>, #{credentials => TokenCreds}).
+
+%% Push with token authentication
+git:push(Repo, <<"origin">>, [<<"main">>], #{credentials => TokenCreds}).
+```
+
+#### SSH Agent Delegation
+
+Delegate to the system SSH agent:
+
+```erlang
+AgentCreds = #{
+  type => ssh_agent,
+  username => <<"git">>
+},
+
+Repo = git:clone(
+  <<"git@github.com:user/private-repo.git">>,
+  <<"/tmp/private-repo">>,
+  #{credentials => AgentCreds}
+).
+```
+
+#### Proplist Format
+
+Credentials can also be specified as a proplist instead of a map:
+
+```erlang
+Creds = [
+  {type, ssh_key},
+  {username, <<"git">>},
+  {privkey, <<"/home/user/.ssh/id_rsa">>},
+  {pubkey, <<"/home/user/.ssh/id_rsa.pub">>}
+],
+
+Repo = git:clone(Url, Path, #{credentials => Creds}).
+```
+
+#### Default Authentication
+
+When no credentials are provided, egit falls back to system-level authentication:
+
+```erlang
+%% Will use SSH agent, ~/.ssh/config, or git credential helper
+Repo = git:clone(Url, Path).
+
+%% Without credentials option - uses defaults
+git:fetch(Repo, <<"origin">>).
+git:push(Repo, <<"origin">>, [<<"main">>]).
+```
+
 ### Remote Management
 
 ```erlang

@@ -127,6 +127,17 @@ static ERL_NIF_TERM ATOM_FAST_FORWARD;
 static ERL_NIF_TERM ATOM_MERGED;
 static ERL_NIF_TERM ATOM_DONE;
 static ERL_NIF_TERM ATOM_NO_CHANGES;
+static ERL_NIF_TERM ATOM_CREDENTIALS;
+static ERL_NIF_TERM ATOM_SSH_KEY;
+static ERL_NIF_TERM ATOM_USERPASS;
+static ERL_NIF_TERM ATOM_TOKEN;
+static ERL_NIF_TERM ATOM_SSH_AGENT;
+static ERL_NIF_TERM ATOM_USERNAME;
+static ERL_NIF_TERM ATOM_PASSWORD;
+static ERL_NIF_TERM ATOM_PRIVKEY;
+static ERL_NIF_TERM ATOM_PUBKEY;
+static ERL_NIF_TERM ATOM_PASSPHRASE;
+static ERL_NIF_TERM ATOM_SKIP;
 
 inline void init_atoms(ErlNifEnv* env)
 {
@@ -257,4 +268,15 @@ inline void init_atoms(ErlNifEnv* env)
   ATOM_MERGED            = enif_make_atom(env, "merged");
   ATOM_DONE              = enif_make_atom(env, "done");
   ATOM_NO_CHANGES        = enif_make_atom(env, "no_changes");
+  ATOM_CREDENTIALS       = enif_make_atom(env, "credentials");
+  ATOM_SSH_KEY           = enif_make_atom(env, "ssh_key");
+  ATOM_USERPASS          = enif_make_atom(env, "userpass");
+  ATOM_TOKEN             = enif_make_atom(env, "token");
+  ATOM_SSH_AGENT         = enif_make_atom(env, "ssh_agent");
+  ATOM_USERNAME          = enif_make_atom(env, "username");
+  ATOM_PASSWORD          = enif_make_atom(env, "password");
+  ATOM_PRIVKEY           = enif_make_atom(env, "privkey");
+  ATOM_PUBKEY            = enif_make_atom(env, "pubkey");
+  ATOM_PASSPHRASE        = enif_make_atom(env, "passphrase");
+  ATOM_SKIP              = enif_make_atom(env, "skip");
 }
